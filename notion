@@ -1,0 +1,336 @@
+# hallo theo Applied AI Hackathon
+
+## Important Links:
+
+Project Submission Form - [https://www.notion.so/367819205d8b80009e8fe249e151b846?pvs=106](https://www.notion.so/367819205d8b80009e8fe249e151b846?pvs=21)
+
+Location: :google-maps: [Donaustraße 44, 12043 Berlin](https://maps.app.goo.gl/mKxJ5hJ715cDv6Ju5)
+
+Hosts : :delta:[The Delta Campus](https://thedelta.io/campus/berlin) 
+
+<aside>
+📝
+
+Book your 10 min tech tooling support session with [Wynand](https://www.linkedin.com/in/wynandviljoen/) from 11:30 - 13:30  👉  https://calendar.google.com/appointments/schedules/AcZssZ3smDhUZ426mpzqX4li-zR4GyzJBN6WRG5Od2k_Kaj83fHT0_MFGWJOKP9jhhOcTTJf67CnzCIO
+
+</aside>
+
+## Agenda
+
+### **Saturday (23 May)**
+
+10:00 - Arrival & Registration 
+10:30 - Welcome & Opening 
+11:00 - Matchmaking & Team Formation 
+11.30 - Building
+11.30-13.00 - On site Tech Support 
+13:00 - Lunch
+20:00 - Location closes 
+
+### **Sunday (24 May)**
+
+10:00 - Arrival & Coffee
+12:30 - Lunch
+**14:00 - Project Submission**
+14:30 - Pitches
+15:30 - Judging & Deliberation 
+16:00 - Award Ceremony
+
+## **Competition Rules & Submission Guidelines**
+
+To compete in the hackathon and have your project considered by the jury, all participants must adhere to the following rules and submission requirements. Failure to meet these guidelines may result in disqualification.
+
+---
+
+## **Submission Requirements**
+
+To qualify for the final judging, you must
+
+- **Submit your project by Sunday at 14:00**
+- **Be a team of max. 5 people**
+- **Use min. 1 partner technology** (listed under resources)
+- **Have created your project newly at this hackathon** (boilerplates are allowed)
+
+### What needs to be submitted
+
+**Project Presentation**
+
+- Record a **2-minute video demo** of your project (using Loom or equivalent platform)
+- Your presentation must include:
+    - Detailed explanation of your solution
+    - Demonstration of key features with a live walkthrough
+
+**Open Source Repository**
+
+- Provide a **public GitHub repository** containing your project's source code
+- Your repository must include:
+    - Comprehensive **README** with setup and installation instructions
+    - Clear documentation of all APIs, frameworks, and tools utilized
+    - Sufficient technical documentation to enable thorough jury evaluation
+
+---
+
+## **Competition Mode**
+
+Participants will submit their final projects by 14:00. All teams that successfully submit will have the opportunity to present their solution live to the jury during the final showcase session.
+
+### Pitches
+
+- Finalists will showcase their projects **live before the jury and audience**
+- Each team delivers a **5-minute presentation**
+- After all presentations, the jury will select the **3 winners (1 per track) and 1 overall winner**
+
+## Hackathon Tracks & Prizes
+
+## Tracks
+
+### [**ElevenLabs**](https://elevenlabs.io/) - Autonomous Tenant & Vendor Operations
+
+**🏆 Track Prize: 6 months of the ElevenLabs Scale tier per team member ($1,980 value each)**
+
+- [Challenge](https://website-git-dev-hiring.preview.buena.com/dev)
+    
+    Tenant communication and service coordination are repetitive, manual, and time-consuming.
+    
+    Maintenance requests, vendor coordination, and status updates often require endless back-and-forth communication.
+    
+    **Your Goal**
+    
+    Design an AI-powered operations layer that automates communication, coordination, and service workflows across tenants, landlords, and vendors.
+    
+    Think AI-powered operations teams that are always on.
+    
+    **Challenge Prompts**
+    
+    - “What if 80% of tenant requests never needed a human?”
+    - “How do we coordinate vendors without back-and-forth chaos?”
+    - “What would a fully automated maintenance workflow look like?”
+    
+    **Inspo**
+    
+    - Automated workflows for repairs, inquiries, and updates
+    - AI chat + voice interfaces
+    - Vendor/internal team task routing
+    - Status tracking and communication loops
+    
+    **Bonus Points**
+    
+    - Real-time voice AI call handling
+    - Multi-channel orchestration (email, SMS, phone)
+    - Sentiment detection and escalation logic
+    - End-to-end resolution tracking
+    
+    **Outcome Vision**
+    
+    An always-on operations engine that handles communication and coordination with minimal human input.
+    
+
+### [Stripe](https://stripe.com/) — Autonomous Payment Operations
+
+**🏆 Track Prize: $5,000 USD in Stripe fee credits (to be used for Payments, Connect, Billing, Tax, and Stripe Sigma)**
+
+- Challenge
+    
+    Property management payments are fragmented, manual, and error-prone — spanning tenants, landlords, and vendors. Late payments, reconciliation issues, and admin overhead slow everything down.
+    
+    Reimagine how money moves between tenants, landlords, and vendors — with automation, intelligence, and zero manual overhead.
+    
+    **Your Goal**
+    
+    Build an automated, intelligent payment system that handles the full payment lifecycle:
+    
+    - Rent collection from tenants
+    - Vendor payouts (maintenance, services)
+    - Owner/landlord disbursements
+    - Smart reminders, retries, and exception handling
+    
+    Think “set-and-forget” finance infrastructure for property operations.
+    
+    **Challenge Prompts**
+    
+    - “What would a fully autonomous rent collection system look like?”
+    - “How do we eliminate payment-related support tickets entirely?”
+    - “Can payments adapt dynamically to tenant or vendor behavior?”
+    
+    **Inspo**
+    
+    - Automated payment flows using Stripe
+    - Logic for scheduling, retries, and failed payments
+    - Smart notifications (late rent, anomalies)
+    - Simple dashboard or API layer for visibility
+    - Automated payments for vendors
+    
+    **Bonus Points** 
+    
+    - AI-driven risk detection (late payer prediction, anomalies)
+    - Dynamic payment plans or negotiation flows
+    - Reconciliation automation across multiple parties
+    
+    **Outcome Vision**
+    
+    A financial operations layer that makes payments invisible, reliable, and stress-free.
+    
+
+### AI Property Operations Copilot
+
+**🏆 Track Prize: overall winning prizes**
+
+- [Challenge](https://website-git-dev-hiring.preview.buena.com/dev)
+    
+    Property managers spend hours every day searching for information, answering repetitive questions, coordinating workflows, and switching between fragmented systems.
+    
+    Emails, tickets, contracts, invoices, meeting notes, and vendor conversations all contain critical operational context — but none of it is unified.
+    
+    AI assistants today still struggle with long-term memory, contextual reasoning, and reliable operational execution.
+    
+    **Your Goal**
+    
+    Build an AI-powered operations copilot that acts like a high-performing property operations teammate.
+    
+    The system should understand context across properties, retrieve the right information instantly, reason through operational tasks, and assist humans with decision-making and execution.
+    
+    Think Claude, but purpose-built for property operations.
+    
+    **Challenge Prompts**
+    
+    - “What would the ideal AI teammate for a property manager look like?”
+    - “How can AI reduce operational overwhelm without removing human oversight?”
+    - “What workflows should AI handle autonomously vs collaboratively?”
+    - “How do we make AI responses trustworthy and context-aware?”
+    
+    **Inspo**
+    
+    - Conversational AI interface for operators/property managers
+    - Context-aware retrieval across emails, tickets, documents, and systems
+    - Workflow execution capabilities (summaries, drafting, task generation, follow-ups)
+    - Long-context memory and reasoning capabilities
+    - Human-in-the-loop approval flows for sensitive actions
+    
+    **Bonus Points**
+    
+    - Multi-step reasoning and task planning
+    - Persistent memory across conversations and properties
+    - AI-generated operational recommendations
+    - Natural language querying across structured + unstructured data
+    - Real-time collaboration between humans and AI agents
+    
+    **Outcome Vision**
+    
+    An intelligent operations copilot that transforms property management from reactive administration into proactive, AI-assisted decision-making.
+    
+
+### Open Track - Build Anything
+
+**🏆 Track Prize: overall winning prizes**
+
+- **Challenge**
+    
+    Not every breakthrough fits neatly into a predefined category.
+    
+    The Open Track is designed for builders who want the freedom to explore bold ideas, unconventional workflows, and entirely new approaches to solving problems in property operations, AI, automation, or beyond.
+    
+    **Your Goal**
+    
+    Build anything ambitious, useful, and technically impressive.
+    
+    Your solution can focus on:
+    
+    - AI
+    - automation
+    - operations
+    - productivity
+    - infrastructure
+    - communication
+    - data systems
+    - or entirely new ideas not covered in the main sponsored tracks.
+    
+    The only requirement:
+    
+    Build something real that creates meaningful value.
+    
+    **Challenge Prompts**
+    
+    - “What problem do you think nobody else is solving?”
+    - “What workflow deserves a complete rethink?”
+    - “What would you build if there were no constraints?”
+    - “What does the future of intelligent operations look like?”
+    
+    **What to Build**
+    
+    - Any product, workflow, platform, agent, or tool
+    - AI-powered systems or traditional software
+    - Experimental concepts or polished MVPs
+    - Consumer-facing or internal operational tools
+    
+    **Bonus Points**
+    
+    - Creative or unexpected problem-solving
+    - Strong technical execution
+    - Exceptional user experience
+    - Clever use of AI, APIs, or automation
+    - Real-world scalability and adoption potential
+    
+    **Outcome Vision**
+    
+    A showcase of ambitious ideas, unconventional thinking, and next-generation products that push beyond the boundaries of the predefined tracks.
+    
+
+## Prizes
+
+### Overall winning team
+
+- BAD1 conference tickets for each team member (valued at €990 per ticket)
+- 3 months of the ElevenLabs Pro tier per team member ($297 value each)
+- The Delta 1 month campus membership for each team member
+- €200 hardware store voucher sponsored by hallo theo per team member
+
+### Other prizes
+
+- 1 month free of our Creator tier (normally $22/month) for all participants
+- Claude credits worth €30 per participant sponsored by Anthropic
+
+## Resources
+
+### Technology Partners
+
+- [Stripe](https://stripe.com/) — Financial infrastructure for the internet powering payments, billing, payouts, and global money movement.
+    - Guide to setting up your sandbox:
+    
+    [Stripe_ Laying the Foundation for Agentic Capabilities - Developer Getting Started (1).pdf](attachment:aaa4c891-f33d-4a1f-88a7-3caa7299cbb4:Stripe__Laying_the_Foundation_for_Agentic_Capabilities_-_Developer_Getting_Started_(1).pdf)
+    
+    - Create your Stripe account: https://dashboard.stripe.com/register
+    - API Docs: [Stripe Documentation](https://docs.stripe.com/)
+    - Developers: [Stripe Developers](https://stripe.dev/)
+- [ElevenLabs](https://elevenlabs.io/) — AI voice technology for real-time conversational experiences and intelligent voice agents.
+    - Hacker guide: https://docs.google.com/document/d/1mCh5MtOzBw0aJpurQVUmIVFfPMAHW3MjNemE-LNiMto/edit?usp=sharing
+    - Discord link: https://discord.com/invite/VnBvbbcdEC
+    - Video tutorial to redeem credits: https://youtu.be/S143_JtCtV8
+    - After the hackathon, please upload your ElevenLabs project to http://showcase.elevenlabs.io/
+- [Anthropic](https://www.anthropic.com/) — An AI safety and research company building advanced AI systems and assistants designed to be reliable, interpretable, and aligned with human values.
+    - Developer Docs: https://platform.claude.com/docs/en/home
+    - Redeem your credits: [https://hallotheohackathon.lovable.app](https://hallotheohackathon.lovable.app/)
+
+## FAQ
+
+- **Will there be any food available in the venue for free or to buy?**
+    
+    Food (lunch and dinner) is provided for all participants free of charge. Snacks and drinks will also be available throughout the hackathon.
+    
+- **Do I need to be in a team, or can I participate solo?**
+    
+    You can form a team of up to **5 people.** Team matchmaking will happen on Saturday after the opening session.
+    
+- **What exactly needs to be submitted?**
+    - A **2-minute video demo** (e.g., Loom)
+    - A **GitHub repository (public!)** with source code, README, documentation, and setup instructions.
+- **Do we need to use the partner technologies?**
+    
+    You must use at least 1 **provided technology** (ElevenLabs, Stripe).
+    
+- **Where do I find help and announcements during the hackathon?**
+    
+    All the information is contained in this notion manual. Any further queries can be directed to Elisabeth Sabeditsch ([elisabeth.sabeditsch@thedelta.io](mailto:elisabeth.sabeditsch@thedelta.io)) or Marlene Muller ([marlene.muller@thedelta.io](mailto:marlene.muller@thedelta.io))
+    
+- **How can I redeem my ElevenLabs credits?**
+    
+    Please watch this video tutorial: https://youtu.be/S143_JtCtV8
