@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Call, CallStatus, TranscriptTurn } from "@/lib/use-theo-events";
+import type { Call, CallStatus, TranscriptTurn } from "@/lib/client/theo-store";
 
 interface Props {
   calls: Call[];

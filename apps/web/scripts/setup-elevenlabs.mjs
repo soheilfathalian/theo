@@ -31,39 +31,37 @@ const prompt = readFileSync(
   "utf8",
 );
 
-// ── Tool definitions (server-side webhook tools) ───────────────────────────
+// ── Tool definitions (CLIENT tools — handled by the browser via the widget) ──
+// We use client tools instead of webhooks so the dashboard updates live without
+// the Vercel serverless container splitting state across requests.
 const toolDefs = [
   {
     name: "start_call",
     description:
-      "Call this immediately AFTER the tenant identifies their apartment (floor + letter) and tells you what's wrong. Creates a call record so the property-manager dashboard lights up the right unit live.",
-    type: "webhook",
-    response_timeout_secs: 10,
-    api_schema: {
-      url: `${WEBHOOK_BASE}/api/theo/start-call`,
-      method: "POST",
-      request_body_schema: {
-        type: "object",
-        required: ["floor", "apartment", "initial_turn"],
-        properties: {
-          floor: {
-            type: "integer",
-            description:
-              "The tenant's floor number (0 = Erdgeschoss, 1 = first floor, ..., 4 = top). Always 0–4.",
-          },
-          apartment: {
-            type: "string",
-            description:
-              "Apartment letter A–E. Always uppercase, single letter.",
-          },
-          tenant_name: {
-            type: "string",
-            description: "Tenant's name if they say it.",
-          },
-          initial_turn: {
-            type: "string",
-            description: "The first sentence the tenant said in German.",
-          },
+      "Call this immediately AFTER the tenant identifies their apartment (floor + letter) and tells you what's wrong. Records the call and lights up the right unit on the dashboard.",
+    type: "client",
+    expects_response: true,
+    response_timeout_secs: 6,
+    parameters: {
+      type: "object",
+      required: ["floor", "apartment", "initial_turn"],
+      properties: {
+        floor: {
+          type: "integer",
+          description:
+            "Floor number 0–4 (0 = Erdgeschoss, 4 = top). Required.",
+        },
+        apartment: {
+          type: "string",
+          description: "Apartment letter A–E, single uppercase letter. Required.",
+        },
+        tenant_name: {
+          type: "string",
+          description: "Tenant's name if mentioned.",
+        },
+        initial_turn: {
+          type: "string",
+          description: "The first German sentence the tenant said.",
         },
       },
     },
@@ -71,29 +69,26 @@ const toolDefs = [
   {
     name: "append_turn",
     description:
-      "Append one line to the live transcript on the property-manager dashboard. Call once after each meaningful exchange — once when the tenant says something substantive, once when you reply substantively. Do NOT call this for greetings or one-word acknowledgments.",
-    type: "webhook",
-    response_timeout_secs: 8,
-    api_schema: {
-      url: `${WEBHOOK_BASE}/api/theo/append-turn`,
-      method: "POST",
-      request_body_schema: {
-        type: "object",
-        required: ["call_id", "speaker", "text"],
-        properties: {
-          call_id: {
-            type: "string",
-            description: "The call_id returned by start_call.",
-          },
-          speaker: {
-            type: "string",
-            enum: ["tenant", "theo"],
-            description: "Who said this line.",
-          },
-          text: {
-            type: "string",
-            description: "The German sentence said. One sentence per call.",
-          },
+      "Append one line to the live transcript. Use after the tenant says something substantive AND after you reply substantively. Skip greetings and one-word acknowledgments.",
+    type: "client",
+    expects_response: true,
+    response_timeout_secs: 4,
+    parameters: {
+      type: "object",
+      required: ["call_id", "speaker", "text"],
+      properties: {
+        call_id: {
+          type: "string",
+          description: "The call_id returned by start_call.",
+        },
+        speaker: {
+          type: "string",
+          enum: ["tenant", "theo"],
+          description: "Who said this line.",
+        },
+        text: {
+          type: "string",
+          description: "The German sentence. One per call.",
         },
       },
     },
@@ -101,36 +96,32 @@ const toolDefs = [
   {
     name: "report_triage",
     description:
-      "Call exactly ONCE when you have enough information to classify the problem. Picks one problem_id from the system-prompt catalogue and tells the backend whether to send a video or dispatch a Handwerker. The 3D dashboard reacts immediately.",
-    type: "webhook",
-    response_timeout_secs: 12,
-    api_schema: {
-      url: `${WEBHOOK_BASE}/api/theo/triage`,
-      method: "POST",
-      request_body_schema: {
-        type: "object",
-        required: ["call_id", "floor", "apartment", "problem_id", "transcript_summary"],
-        properties: {
-          call_id: {
-            type: "string",
-            description: "The call_id returned by start_call.",
-          },
-          floor: { type: "integer", description: "Floor 0–4." },
-          apartment: { type: "string", description: "Letter A–E uppercase." },
-          transcript_summary: {
-            type: "string",
-            description:
-              "One short German sentence summarising what the tenant reported.",
-          },
-          problem_id: {
-            type: "string",
-            description:
-              "Exactly one of the IDs from the system-prompt catalogue.",
-          },
-          reasoning: {
-            type: "string",
-            description: "One-line reason you picked this problem_id.",
-          },
+      "Call exactly ONCE when you have enough information to classify the problem. Picks one problem_id from the catalogue. The 3D dashboard reacts immediately and the side effect (email or Stripe dispatch) is triggered.",
+    type: "client",
+    expects_response: true,
+    response_timeout_secs: 8,
+    parameters: {
+      type: "object",
+      required: ["call_id", "floor", "apartment", "problem_id", "transcript_summary"],
+      properties: {
+        call_id: {
+          type: "string",
+          description: "The call_id returned by start_call.",
+        },
+        floor: { type: "integer", description: "Floor 0–4." },
+        apartment: { type: "string", description: "Letter A–E uppercase." },
+        transcript_summary: {
+          type: "string",
+          description:
+            "One short German sentence summarising what the tenant reported.",
+        },
+        problem_id: {
+          type: "string",
+          description: "Exactly one of the IDs from the catalogue.",
+        },
+        reasoning: {
+          type: "string",
+          description: "One-line reason for the pick.",
         },
       },
     },
@@ -162,26 +153,35 @@ async function listTools() {
   return data.tools ?? [];
 }
 
+async function deleteTool(id) {
+  const res = await fetch(`https://api.elevenlabs.io/v1/convai/tools/${id}`, {
+    method: "DELETE",
+    headers: { "xi-api-key": API_KEY },
+  });
+  if (!res.ok && res.status !== 404) {
+    const txt = await res.text();
+    console.warn(`  (delete failed ${res.status}: ${txt.slice(0, 200)})`);
+  }
+}
+
 console.log("→ Listing existing tools…");
 const existing = await listTools();
 const toolIds = [];
 
 for (const def of toolDefs) {
-  const match = existing.find((t) =>
-    (t.tool_config?.name ?? t.name) === def.name,
+  const match = existing.find(
+    (t) => (t.tool_config?.name ?? t.name) === def.name,
   );
-  if (match) {
+  const matchType = match?.tool_config?.type ?? match?.type;
+
+  if (match && matchType === def.type) {
     const id = match.id ?? match.tool_id;
-    console.log(`  ✓ Reusing existing tool ${def.name} (${id})`);
-    // PATCH the existing tool to make sure the URL / schema is current.
+    console.log(`  ✓ Reusing ${def.name} (${id})`);
     const patchRes = await fetch(
       `https://api.elevenlabs.io/v1/convai/tools/${id}`,
       {
         method: "PATCH",
-        headers: {
-          "xi-api-key": API_KEY,
-          "Content-Type": "application/json",
-        },
+        headers: { "xi-api-key": API_KEY, "Content-Type": "application/json" },
         body: JSON.stringify({ tool_config: def }),
       },
     );
@@ -191,9 +191,14 @@ for (const def of toolDefs) {
     }
     toolIds.push(id);
   } else {
+    if (match) {
+      const oldId = match.id ?? match.tool_id;
+      console.log(`  ~ Type changed (${matchType} → ${def.type}); deleting ${def.name} ${oldId}`);
+      await deleteTool(oldId);
+    }
     const created = await createTool(def);
     const id = created.id ?? created.tool_id;
-    console.log(`  + Created tool ${def.name} (${id})`);
+    console.log(`  + Created ${def.name} as ${def.type} (${id})`);
     toolIds.push(id);
   }
 }

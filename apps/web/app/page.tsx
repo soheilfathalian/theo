@@ -1,27 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BuildingScene } from "@/components/building-scene";
 import { ScenarioControls } from "@/components/scenario-controls";
 import { PmPanel } from "@/components/pm-panel";
 import { TheoWidget } from "@/components/theo-widget";
-import { useTheoEvents } from "@/lib/use-theo-events";
+import { useTheoStore } from "@/lib/client/theo-store";
 import type { Unit } from "@/lib/unit-types";
 
 export default function Home() {
-  const { units, calls, stats, connected } = useTheoEvents();
+  const { units, calls, stats, handlers, reset } = useTheoStore();
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
 
-  // Auto-select the most recent in-progress call so PM sees live action
-  useEffect(() => {
-    if (!selectedCallId && calls.length > 0) {
-      const live = calls.find((c) => c.status === "in_progress");
-      if (live) setSelectedCallId(live.id);
-    }
-  }, [calls, selectedCallId]);
-
   function handleUnitClick(u: Unit) {
-    // When the PM clicks a unit, jump to that unit's latest call
     const callForUnit = calls.find((c) => c.unit_id === u.id);
     if (callForUnit) setSelectedCallId(callForUnit.id);
   }
@@ -35,12 +26,7 @@ export default function Home() {
             <span>hallo theo</span>
             <span className="text-zinc-600">·</span>
             <span>theo</span>
-            <span
-              className={`size-1.5 rounded-full ${
-                connected ? "bg-emerald-400" : "bg-zinc-600"
-              }`}
-              title={connected ? "Live" : "Disconnected"}
-            />
+            <span className="size-1.5 rounded-full bg-emerald-400" />
           </div>
           <h1 className="mt-1 text-2xl font-semibold">Your AI Hausmeister</h1>
         </div>
@@ -73,8 +59,8 @@ export default function Home() {
         onSelect={setSelectedCallId}
       />
 
-      <ScenarioControls />
-      <TheoWidget />
+      <ScenarioControls handlers={handlers} reset={reset} />
+      <TheoWidget handlers={handlers} />
     </div>
   );
 }
