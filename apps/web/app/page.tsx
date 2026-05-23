@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { BuildingScene } from "@/components/building-scene";
 import { ScenarioControls } from "@/components/scenario-controls";
 import { PmPanel } from "@/components/pm-panel";
+import { TheoWidget } from "@/components/theo-widget";
 import { useTheoEvents } from "@/lib/use-theo-events";
 import type { Unit } from "@/lib/unit-types";
 
@@ -73,6 +74,7 @@ export default function Home() {
       />
 
       <ScenarioControls />
+      <TheoWidget />
     </div>
   );
 }
