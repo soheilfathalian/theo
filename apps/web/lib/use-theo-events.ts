@@ -57,7 +57,7 @@ export interface TheoState {
   connected: boolean;
 }
 
-const DEFAULT_STATS: Stats = { deflected: 9, dispatched: 5, savedEuros: 1800 };
+const DEFAULT_STATS: Stats = { deflected: 0, dispatched: 0, savedEuros: 0 };
 
 function upsertCall(curr: Call[], incoming: Call): Call[] {
   const i = curr.findIndex((c) => c.id === incoming.id);

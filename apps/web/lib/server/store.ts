@@ -63,8 +63,8 @@ class TheoStore {
   private events: TheoEvent[] = [];
   private calls = new Map<string, Call>();
   private bus = new EventEmitter();
-  private deflected = 9;
-  private dispatched = 5;
+  private deflected = 0;
+  private dispatched = 0;
 
   constructor() {
     UNITS.forEach((u) => {

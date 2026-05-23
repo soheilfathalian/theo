@@ -19,8 +19,11 @@ declare module "react" {
 }
 
 /**
- * Mounts the ElevenLabs Conv AI floating widget. The web component handles
- * its own positioning, theming and call UI — we just render the script + tag.
+ * Mount the ElevenLabs Conv AI widget and force it to sit at the bottom-LEFT
+ * of the viewport, well clear of the property-manager panel on the right.
+ *
+ * The widget renders into its own shadow DOM, so we override its outermost
+ * positioning via a high-specificity rule on the host element itself.
  */
 export function TheoWidget() {
   if (!AGENT_ID) return null;
@@ -32,6 +35,15 @@ export function TheoWidget() {
         async
         type="text/javascript"
       />
+      <style>{`
+        elevenlabs-convai {
+          position: fixed !important;
+          left: 24px !important;
+          right: auto !important;
+          bottom: 24px !important;
+          z-index: 60 !important;
+        }
+      `}</style>
       <elevenlabs-convai agent-id={AGENT_ID} />
     </>
   );
