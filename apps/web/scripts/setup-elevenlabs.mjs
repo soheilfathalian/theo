@@ -209,7 +209,7 @@ const agentBody = {
         tool_ids: toolIds,
       },
       first_message:
-        "Hallo, hier ist Theo von hallo theo. Bevor wir starten — in welcher Wohnung sind Sie? Bitte Stock und Buchstabe, zum Beispiel zwei C.",
+        "Hier ist Theo. Welche Wohnung? Stock und Buchstabe.",
       language: "de",
     },
     tts: {
