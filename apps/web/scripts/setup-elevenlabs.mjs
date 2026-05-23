@@ -1,14 +1,13 @@
 /**
- * Create the Theo ElevenLabs Conversational AI agent.
+ * Create or update the Theo ElevenLabs Conversational AI agent.
  *
- * Required env:
+ * Required env (from apps/web/.env.local):
  *   ELEVENLABS_API_KEY        - your ElevenLabs API key
  *   THEO_WEBHOOK_BASE_URL     - public URL where /api/theo/* routes are reachable
- *                               (e.g. your Vercel deploy or an ngrok tunnel to localhost)
  *
  * Optional env:
  *   ELEVENLABS_VOICE_ID       - voice ID to use (defaults to a German male voice)
- *   THEO_AGENT_ID             - if set, update an existing agent instead of creating
+ *   THEO_AGENT_ID             - if set, PATCH that agent instead of creating
  *
  * Usage:
  *   node scripts/setup-elevenlabs.mjs
@@ -21,50 +20,49 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const API_KEY = process.env.ELEVENLABS_API_KEY;
 const WEBHOOK_BASE = process.env.THEO_WEBHOOK_BASE_URL;
-// Sensible German male default; override per taste.
 const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "pNInz6obpgDQGcFmaJgB";
 const EXISTING_ID = process.env.THEO_AGENT_ID;
 
-if (!API_KEY) {
-  console.error("Missing ELEVENLABS_API_KEY env var.");
-  process.exit(1);
-}
-if (!WEBHOOK_BASE) {
-  console.error(
-    "Missing THEO_WEBHOOK_BASE_URL env var. Set to your Vercel URL or an ngrok tunnel.",
-  );
-  process.exit(1);
-}
+if (!API_KEY) { console.error("Missing ELEVENLABS_API_KEY"); process.exit(1); }
+if (!WEBHOOK_BASE) { console.error("Missing THEO_WEBHOOK_BASE_URL"); process.exit(1); }
 
 const prompt = readFileSync(
   resolve(__dirname, "theo-system-prompt.md"),
   "utf8",
 );
 
-const tools = [
+// ── Tool definitions (server-side webhook tools) ───────────────────────────
+const toolDefs = [
   {
     name: "start_call",
     description:
-      "Call once at the start of the conversation. Creates a call record so the property-manager dashboard sees the call as live.",
+      "Call this immediately AFTER the tenant identifies their apartment (floor + letter) and tells you what's wrong. Creates a call record so the property-manager dashboard lights up the right unit live.",
     type: "webhook",
+    response_timeout_secs: 10,
     api_schema: {
       url: `${WEBHOOK_BASE}/api/theo/start-call`,
       method: "POST",
       request_body_schema: {
         type: "object",
-        required: ["initial_turn"],
+        required: ["floor", "apartment", "initial_turn"],
         properties: {
-          unit_label: {
+          floor: {
+            type: "integer",
+            description:
+              "The tenant's floor number (0 = Erdgeschoss, 1 = first floor, ..., 4 = top). Always 0–4.",
+          },
+          apartment: {
             type: "string",
-            description: "The tenant's apartment label, e.g. 'Apt 2C' (free-form).",
+            description:
+              "Apartment letter A–E. Always uppercase, single letter.",
           },
           tenant_name: {
             type: "string",
-            description: "The tenant's name if known.",
+            description: "Tenant's name if they say it.",
           },
           initial_turn: {
             type: "string",
-            description: "The first sentence the tenant said.",
+            description: "The first sentence the tenant said in German.",
           },
         },
       },
@@ -73,8 +71,9 @@ const tools = [
   {
     name: "append_turn",
     description:
-      "Append a turn to the live transcript on the property-manager dashboard. Use after each meaningful exchange.",
+      "Append one line to the live transcript on the property-manager dashboard. Call once after each meaningful exchange — once when the tenant says something substantive, once when you reply substantively. Do NOT call this for greetings or one-word acknowledgments.",
     type: "webhook",
+    response_timeout_secs: 8,
     api_schema: {
       url: `${WEBHOOK_BASE}/api/theo/append-turn`,
       method: "POST",
@@ -82,9 +81,19 @@ const tools = [
         type: "object",
         required: ["call_id", "speaker", "text"],
         properties: {
-          call_id: { type: "string" },
-          speaker: { type: "string", enum: ["tenant", "theo"] },
-          text: { type: "string" },
+          call_id: {
+            type: "string",
+            description: "The call_id returned by start_call.",
+          },
+          speaker: {
+            type: "string",
+            enum: ["tenant", "theo"],
+            description: "Who said this line.",
+          },
+          text: {
+            type: "string",
+            description: "The German sentence said. One sentence per call.",
+          },
         },
       },
     },
@@ -92,29 +101,35 @@ const tools = [
   {
     name: "report_triage",
     description:
-      "Report the triage decision exactly once. Picks one problem_id from the catalogue and triggers either a tutorial-send or a Handwerker dispatch.",
+      "Call exactly ONCE when you have enough information to classify the problem. Picks one problem_id from the system-prompt catalogue and tells the backend whether to send a video or dispatch a Handwerker. The 3D dashboard reacts immediately.",
     type: "webhook",
+    response_timeout_secs: 12,
     api_schema: {
       url: `${WEBHOOK_BASE}/api/theo/triage`,
       method: "POST",
       request_body_schema: {
         type: "object",
-        required: ["problem_id", "transcript_summary"],
+        required: ["call_id", "floor", "apartment", "problem_id", "transcript_summary"],
         properties: {
-          unit_label: { type: "string" },
-          tenant_name: { type: "string" },
+          call_id: {
+            type: "string",
+            description: "The call_id returned by start_call.",
+          },
+          floor: { type: "integer", description: "Floor 0–4." },
+          apartment: { type: "string", description: "Letter A–E uppercase." },
           transcript_summary: {
             type: "string",
             description:
-              "One-sentence summary of the tenant's issue in German.",
+              "One short German sentence summarising what the tenant reported.",
           },
           problem_id: {
             type: "string",
-            description: "Exactly one of the catalogue IDs from the system prompt.",
+            description:
+              "Exactly one of the IDs from the system-prompt catalogue.",
           },
           reasoning: {
             type: "string",
-            description: "Brief justification for the pick.",
+            description: "One-line reason you picked this problem_id.",
           },
         },
       },
@@ -122,6 +137,68 @@ const tools = [
   },
 ];
 
+// ── Step 1: create the tools in the workspace ──────────────────────────────
+async function createTool(toolConfig) {
+  const res = await fetch("https://api.elevenlabs.io/v1/convai/tools", {
+    method: "POST",
+    headers: {
+      "xi-api-key": API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ tool_config: toolConfig }),
+  });
+  const txt = await res.text();
+  if (!res.ok) {
+    throw new Error(`Tool create failed (${res.status}): ${txt}`);
+  }
+  return JSON.parse(txt);
+}
+
+async function listTools() {
+  const res = await fetch("https://api.elevenlabs.io/v1/convai/tools", {
+    headers: { "xi-api-key": API_KEY },
+  });
+  const data = await res.json();
+  return data.tools ?? [];
+}
+
+console.log("→ Listing existing tools…");
+const existing = await listTools();
+const toolIds = [];
+
+for (const def of toolDefs) {
+  const match = existing.find((t) =>
+    (t.tool_config?.name ?? t.name) === def.name,
+  );
+  if (match) {
+    const id = match.id ?? match.tool_id;
+    console.log(`  ✓ Reusing existing tool ${def.name} (${id})`);
+    // PATCH the existing tool to make sure the URL / schema is current.
+    const patchRes = await fetch(
+      `https://api.elevenlabs.io/v1/convai/tools/${id}`,
+      {
+        method: "PATCH",
+        headers: {
+          "xi-api-key": API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ tool_config: def }),
+      },
+    );
+    if (!patchRes.ok) {
+      const err = await patchRes.text();
+      console.warn(`    (patch failed ${patchRes.status}: ${err.slice(0, 200)})`);
+    }
+    toolIds.push(id);
+  } else {
+    const created = await createTool(def);
+    const id = created.id ?? created.tool_id;
+    console.log(`  + Created tool ${def.name} (${id})`);
+    toolIds.push(id);
+  }
+}
+
+// ── Step 2: create or update the agent, attaching tool_ids ─────────────────
 const agentBody = {
   name: "Theo — AI Hausmeister (hallo theo)",
   conversation_config: {
@@ -129,8 +206,10 @@ const agentBody = {
       prompt: {
         prompt,
         llm: "claude-sonnet-4-5",
+        tool_ids: toolIds,
       },
-      first_message: "Hallo, hier ist Theo von hallo theo. Was ist los?",
+      first_message:
+        "Hallo, hier ist Theo von hallo theo. Bevor wir starten — in welcher Wohnung sind Sie? Bitte Stock und Buchstabe, zum Beispiel zwei C.",
       language: "de",
     },
     tts: {
@@ -144,18 +223,8 @@ const agentBody = {
       provider: "elevenlabs",
       user_input_audio_format: "pcm_16000",
     },
-    turn: {
-      turn_timeout: 7,
-      mode: "turn",
-    },
+    turn: { turn_timeout: 7, mode: "turn" },
   },
-  platform_settings: {
-    privacy: {
-      record_voice: true,
-      retention_days: 7,
-    },
-  },
-  tools,
 };
 
 const endpoint = EXISTING_ID
@@ -173,20 +242,12 @@ const res = await fetch(endpoint, {
 
 const text = await res.text();
 if (!res.ok) {
-  console.error(`ElevenLabs API error ${res.status}:\n${text}`);
+  console.error(`Agent ${EXISTING_ID ? "update" : "create"} failed ${res.status}:\n${text}`);
   process.exit(1);
 }
 
-let parsed;
-try {
-  parsed = JSON.parse(text);
-} catch {
-  console.log(text);
-  process.exit(0);
-}
-
-console.log(JSON.stringify(parsed, null, 2));
-if (parsed.agent_id) {
-  console.log(`\n✓ Theo agent ${EXISTING_ID ? "updated" : "created"}: ${parsed.agent_id}`);
-  console.log(`  Test it at: https://elevenlabs.io/app/conversational-ai/agents/${parsed.agent_id}`);
-}
+const parsed = JSON.parse(text);
+const agentId = parsed.agent_id ?? EXISTING_ID;
+console.log(`\n✓ Agent ${EXISTING_ID ? "updated" : "created"}: ${agentId}`);
+console.log(`  Tools attached: ${toolIds.length}`);
+console.log(`  Test it at: https://elevenlabs.io/app/conversational-ai/agents/${agentId}`);

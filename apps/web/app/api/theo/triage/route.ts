@@ -1,21 +1,9 @@
 /**
- * Webhook called by the ElevenLabs Theo agent during a conversation.
- *
- * The agent invokes this with the triage decision (problem + resolution).
- * We create a Call record, drive the unit state through its color sequence,
- * and the dashboard sees everything live via SSE.
- *
- * Body shape (sent by the agent's `report_triage` tool):
- * {
- *   "unit_label": "Apt 2C",           // optional, free-form; we resolve to a unit
- *   "tenant_name": "Familie Schmidt", // optional, fallback to unit's tenant
- *   "transcript_summary": "Spüle ist verstopft, Saugglocke nicht versucht.",
- *   "problem_id": "p-abfluss",        // matches lib/data/problems.ts
- *   "reasoning": "Classic clogged sink."
- * }
+ * Webhook the ElevenLabs Theo agent calls when it has classified the issue.
+ * Drives the unit color sequence and the live action block.
  */
 import { store } from "@/lib/server/store";
-import { UNITS } from "@/lib/unit-config";
+import { resolveUnit } from "@/lib/server/find-unit";
 import { PROBLEMS } from "@/lib/data/problems";
 import { VIDEOS } from "@/lib/data/videos";
 import { pickBestVendor } from "@/lib/data/service-providers";
@@ -24,20 +12,14 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 interface TriageBody {
+  call_id?: string;
+  floor?: number;
+  apartment?: string;
   unit_label?: string;
   tenant_name?: string;
   transcript_summary?: string;
   problem_id: string;
   reasoning?: string;
-}
-
-function findUnit(label?: string) {
-  if (!label) return UNITS[Math.floor(Math.random() * UNITS.length)];
-  const norm = label.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return (
-    UNITS.find((u) => u.label.toLowerCase().replace(/[^a-z0-9]/g, "") === norm)
-      ?? UNITS[Math.floor(Math.random() * UNITS.length)]
-  );
 }
 
 function delay(ms: number) {
@@ -60,57 +42,65 @@ export async function POST(req: Request) {
     );
   }
 
-  const unit = findUnit(body.unit_label);
-  const tenantName = body.tenant_name ?? unit.tenant_name ?? "Tenant";
+  // Reuse the call started earlier in the conversation if call_id was provided;
+  // otherwise create a fresh one (some agents skip start_call).
+  let callId: string;
+  if (body.call_id && store.getCall(body.call_id)) {
+    callId = body.call_id;
+  } else {
+    const unit = resolveUnit(body);
+    const call = store.startCall({
+      unit_id: unit.id,
+      tenant_name: body.tenant_name ?? unit.tenant_name ?? "Mieter",
+      initial_turn: body.transcript_summary ?? "(call started)",
+    });
+    callId = call.id;
+  }
 
-  const call = store.startCall({
-    unit_id: unit.id,
-    tenant_name: tenantName,
-    initial_turn: body.transcript_summary ?? "(call started)",
+  const call = store.getCall(callId)!;
+
+  store.decideTriage(callId, {
+    problem_id: problem.id,
+    problem_name: problem.name,
+    resolution: problem.resolution,
+    reasoning: body.reasoning,
   });
 
-  // Fire-and-forget animation sequence so the PM dashboard sees a live flow.
+  // Fire-and-forget visualization sequence so the dashboard streams a clear flow.
   (async () => {
-    await delay(400);
-    store.decideTriage(call.id, {
-      problem_id: problem.id,
-      problem_name: problem.name,
-      resolution: problem.resolution,
-      reasoning: body.reasoning,
-    });
-
     if (problem.resolution === "video") {
-      store.setUnitStatus(unit.id, "yellow", `Video gesendet · ${problem.name}`);
+      store.setUnitStatus(call.unit_id, "yellow", `Video gesendet · ${problem.name}`);
       await delay(900);
       const video = VIDEOS.find((v) => v.id === problem.video_id);
-      if (video) store.recordVideoSent(call.id, video.youtube_url);
+      if (video) store.recordVideoSent(callId, video.youtube_url);
       await delay(300);
-      store.endCall(call.id);
-      await delay(4000);
-      store.setUnitStatus(unit.id, "green");
+      store.endCall(callId);
+      await delay(4500);
+      store.setUnitStatus(call.unit_id, "green");
     } else {
       const vendor = pickBestVendor(problem.category);
-      store.setUnitStatus(unit.id, "red", `Notfall · ${problem.name}`);
-      await delay(1400);
-      store.recordDispatch(call.id, {
+      store.setUnitStatus(call.unit_id, "red", `Notfall · ${problem.name}`);
+      await delay(1500);
+      store.recordDispatch(callId, {
         vendor_name: vendor.name,
         vendor_slot: "morgen 9:00",
         amount_cents: 34000,
       });
       store.setUnitStatus(
-        unit.id,
+        call.unit_id,
         "orange",
         `${vendor.name} · morgen 9:00 · €340 hinterlegt`,
       );
       await delay(300);
-      store.endCall(call.id);
+      store.endCall(callId);
     }
   })().catch(console.error);
 
   return NextResponse.json({
     ok: true,
-    call_id: call.id,
-    unit_id: unit.id,
+    call_id: callId,
+    unit_id: call.unit_id,
+    unit_label: call.unit_id.replace("u-", "Apt ").toUpperCase(),
     problem,
   });
 }
