@@ -6,6 +6,14 @@ import type { Unit, UnitStatus } from "@/lib/unit-types";
 import { PROBLEMS } from "@/lib/data/problems";
 import { VIDEOS } from "@/lib/data/videos";
 import { SERVICE_PROVIDERS } from "@/lib/data/service-providers";
+import {
+  type EmailDraft,
+  accentForKind,
+  bodyToHtml,
+  tutorialDraft,
+  tenantQuoteUpdateDraft,
+  vendorQuoteDraft,
+} from "@/lib/email/templates";
 import { resolveUnit, randomUnit } from "./resolve-unit";
 
 export type CallStatus =
@@ -75,12 +83,26 @@ export interface TheoHandlers {
   }) => Promise<string>;
 }
 
+export type PmEmailAction = "video" | "quote_request";
+
 export interface PmActions {
-  /** PM sends the curated tutorial video to the tenant. Yellow → green. */
-  sendVideo: (callId: string) => Promise<void>;
-  /** PM dispatches one of the suggested vendors. Red → orange. */
-  dispatch: (callId: string, vendorId: string) => Promise<void>;
+  /** Compose the tutorial draft so the PM can review/edit before send. */
+  prepareVideoDrafts: (callId: string) => EmailDraft[];
+  /** Compose the tenant-update + 3 vendor-quote drafts for PM review. */
+  prepareQuoteDrafts: (callId: string) => EmailDraft[];
+  /**
+   * Send all PM-approved drafts in parallel, then mutate state:
+   *   - "video" → status video_sent, unit green
+   *   - "quote_request" → status dispatched, unit orange
+   */
+  sendApprovedEmails: (
+    callId: string,
+    drafts: EmailDraft[],
+    action: PmEmailAction,
+  ) => Promise<void>;
 }
+
+const TENANT_EMAIL_DISPLAY = "mieter@beispiel.de";
 
 function newCallId(): string {
   return `c-${(globalThis.crypto?.randomUUID?.() ?? Math.random().toString(16)).slice(0, 10)}`;
@@ -257,84 +279,89 @@ export function useTheoStore() {
 
   const pmActions: PmActions = useMemo(
     () => ({
-      async sendVideo(callId) {
+      prepareVideoDrafts(callId) {
         const call = calls.find((c) => c.id === callId);
-        if (!call || !call.problem_id) return;
+        if (!call || !call.problem_id) return [];
         const problem = PROBLEMS.find((p) => p.id === call.problem_id);
         const video = problem?.video_id
           ? VIDEOS.find((v) => v.id === problem.video_id)
           : undefined;
-        if (!video) return;
-
-        patchCall(callId, { status: "video_sent", video_sent_at: nowIso() });
-        setUnitStatus(call.unit_id, "green", undefined);
-
-        // Fire-and-forget email (dry-run if Resend not configured)
-        void fetch("/api/email/tutorial", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tenant_name: call.tenant_name,
-            problem_name: problem?.name,
-            video_url: video.youtube_url,
-            video_title: video.title,
+        if (!problem || !video) return [];
+        return [
+          tutorialDraft({
+            tenantName: call.tenant_name,
+            problem,
+            video,
+            tenantEmailDisplay: TENANT_EMAIL_DISPLAY,
           }),
-        }).catch(() => {});
+        ];
       },
 
-      async dispatch(callId, vendorId) {
+      prepareQuoteDrafts(callId) {
+        const call = calls.find((c) => c.id === callId);
+        if (!call || !call.problem_id) return [];
+        const problem = PROBLEMS.find((p) => p.id === call.problem_id);
+        const unit = units.find((u) => u.id === call.unit_id);
+        if (!problem || !unit) return [];
+        const vendors = SERVICE_PROVIDERS.filter(
+          (v) => v.category === problem.category,
+        );
+        return [
+          tenantQuoteUpdateDraft({
+            tenantName: call.tenant_name,
+            problem,
+            vendorCount: vendors.length,
+            tenantEmailDisplay: TENANT_EMAIL_DISPLAY,
+          }),
+          ...vendors.map((vendor) =>
+            vendorQuoteDraft({
+              vendor,
+              problem,
+              unit,
+              tenantName: call.tenant_name,
+            }),
+          ),
+        ];
+      },
+
+      async sendApprovedEmails(callId, drafts, action) {
         const call = calls.find((c) => c.id === callId);
         if (!call) return;
-        const vendor = SERVICE_PROVIDERS.find((v) => v.id === vendorId);
-        if (!vendor) return;
-        const unit = units.find((u) => u.id === call.unit_id);
-        const problem = call.problem_id
-          ? PROBLEMS.find((p) => p.id === call.problem_id)
-          : undefined;
 
-        patchCall(callId, {
-          status: "dispatched",
-          dispatched_vendor_id: vendorId,
-          dispatched_at: nowIso(),
-        });
-        setUnitStatus(
-          call.unit_id,
-          "orange",
-          `${vendor.name} dispatched`,
+        await Promise.allSettled(
+          drafts.map((d) =>
+            fetch("/api/email/send", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                subject: d.subject,
+                html: bodyToHtml(d.body_text, accentForKind(d.kind)),
+                to_display: d.to_display,
+              }),
+            }).catch(() => undefined),
+          ),
         );
 
-        // Fire-and-forget: Stripe deposit + tenant confirmation + vendor brief
-        void fetch("/api/stripe/transfer", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            vendor_id: vendor.id,
-            amount_cents: 34000,
-          }),
-        }).catch(() => {});
-        void fetch("/api/email/dispatch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tenant_name: call.tenant_name,
-            vendor_name: vendor.name,
-            vendor_slot: "morgen 9:00",
-            amount_cents: 34000,
-          }),
-        }).catch(() => {});
-        void fetch("/api/email/vendor-dispatch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            vendor_name: vendor.name,
-            vendor_email: vendor.email,
-            problem_name: problem?.name ?? "Reparatur",
-            unit_label: unit?.label ?? call.unit_id,
-            tenant_name: call.tenant_name,
-            vendor_slot: "morgen 9:00",
-            amount_cents: 34000,
-          }),
-        }).catch(() => {});
+        if (action === "video") {
+          patchCall(callId, {
+            status: "video_sent",
+            video_sent_at: nowIso(),
+          });
+          setUnitStatus(call.unit_id, "green", undefined);
+        } else {
+          const vendorCount = drafts.filter(
+            (d) => d.kind === "vendor_quote_request",
+          ).length;
+          patchCall(callId, {
+            status: "dispatched",
+            dispatched_at: nowIso(),
+          });
+          setUnitStatus(
+            call.unit_id,
+            "orange",
+            `Wartet auf Angebote · ${vendorCount} angefragt`,
+          );
+        }
       },
     }),
     [calls, units],

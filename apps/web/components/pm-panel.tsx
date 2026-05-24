@@ -6,6 +6,7 @@ import type { Unit } from "@/lib/unit-types";
 import { PROBLEMS } from "@/lib/data/problems";
 import { VIDEOS, type Video } from "@/lib/data/videos";
 import { SERVICE_PROVIDERS } from "@/lib/data/service-providers";
+import { EmailReview } from "@/components/email-review";
 
 interface Props {
   calls: Call[];
@@ -22,7 +23,7 @@ const STATUS_LABEL: Record<CallStatus, string> = {
   video_pending: "Tutorial",
   dispatch_pending: "Aktion nötig",
   video_sent: "Tutorial gesendet",
-  dispatched: "Handwerker",
+  dispatched: "Angebote angefragt",
   ended: "Beendet",
 };
 
@@ -457,7 +458,7 @@ function VideoCard({ video }: { video: Video }) {
 }
 
 function VideoPane({ call, pmActions }: { call: Call; pmActions: PmActions }) {
-  const [busy, setBusy] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const problem = PROBLEMS.find((p) => p.id === call.problem_id);
   const video = problem?.video_id
     ? VIDEOS.find((v) => v.id === problem.video_id)
@@ -466,13 +467,18 @@ function VideoPane({ call, pmActions }: { call: Call; pmActions: PmActions }) {
 
   const sent = call.status === "video_sent";
 
-  async function send() {
-    setBusy(true);
-    try {
-      await pmActions.sendVideo(call.id);
-    } finally {
-      setBusy(false);
-    }
+  if (reviewing && !sent) {
+    return (
+      <EmailReview
+        drafts={pmActions.prepareVideoDrafts(call.id)}
+        contextLabel="Tutorial-Mail"
+        onBack={() => setReviewing(false)}
+        onSend={async (drafts) => {
+          await pmActions.sendApprovedEmails(call.id, drafts, "video");
+          setReviewing(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -493,11 +499,10 @@ function VideoPane({ call, pmActions }: { call: Call; pmActions: PmActions }) {
         </div>
       ) : (
         <button
-          onClick={send}
-          disabled={busy}
-          className="rounded-[8px] bg-[var(--warning)] px-3 py-2.5 text-[13px] font-medium text-[#3a2a05] transition-all duration-150 hover:translate-y-[-1px] hover:shadow-[0_8px_20px_-4px_rgba(245,184,66,0.45)] active:translate-y-0 disabled:opacity-60"
+          onClick={() => setReviewing(true)}
+          className="rounded-[8px] bg-[var(--warning)] px-3 py-2.5 text-[13px] font-medium text-[#3a2a05] transition-all duration-150 hover:translate-y-[-1px] hover:shadow-[0_8px_20px_-4px_rgba(245,184,66,0.45)] active:translate-y-0"
         >
-          {busy ? "Sending…" : "Send to tenant"}
+          Review tutorial email →
         </button>
       )}
     </div>
@@ -511,70 +516,73 @@ function DispatchPane({
   call: Call;
   pmActions: PmActions;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
   const problem = PROBLEMS.find((p) => p.id === call.problem_id);
   const vendors = problem
     ? SERVICE_PROVIDERS.filter((v) => v.category === problem.category)
     : SERVICE_PROVIDERS;
   const dispatched = call.status === "dispatched";
-  const dispatchedVendorId = call.dispatched_vendor_id;
 
-  async function dispatch(vendorId: string) {
-    setBusy(vendorId);
-    try {
-      await pmActions.dispatch(call.id, vendorId);
-    } finally {
-      setBusy(null);
-    }
+  if (reviewing && !dispatched) {
+    return (
+      <EmailReview
+        drafts={pmActions.prepareQuoteDrafts(call.id)}
+        contextLabel="Angebotsanfragen"
+        onBack={() => setReviewing(false)}
+        onSend={async (drafts) => {
+          await pmActions.sendApprovedEmails(call.id, drafts, "quote_request");
+          setReviewing(false);
+        }}
+      />
+    );
   }
 
   return (
     <div className="flex flex-col gap-2.5">
       <SectionLabel
-        label={dispatched ? "Handwerker dispatched" : "Suggested Handwerker"}
-        right={`${vendors.length.toString().padStart(2, "0")} options`}
+        label={dispatched ? "Angebote angefragt" : "Quote candidates"}
+        right={
+          dispatched && call.dispatched_at
+            ? `sent ${timeAgo(call.dispatched_at)}`
+            : `${vendors.length.toString().padStart(2, "0")} Handwerker`
+        }
       />
       <div className="flex flex-col gap-2">
-        {vendors.map((v) => {
-          const isWinner = dispatchedVendorId === v.id;
-          return (
-            <div
-              key={v.id}
-              className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 transition ${
-                isWinner
-                  ? "border-[rgba(255,138,77,0.3)] bg-[var(--dispatch-soft)]"
-                  : dispatched
-                  ? "border-[var(--rule)] bg-[var(--card)] opacity-40"
-                  : "border-[var(--rule)] bg-[var(--card)] hover:border-[var(--rule-strong)] hover:bg-[var(--card-hover)]"
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium text-[var(--text)]">
-                  {v.name}
-                </div>
-                <div className="mt-0.5 font-mono text-[10.5px] tracking-[0.02em] text-[var(--text-3)]">
-                  ★ {v.rating.toFixed(1)}
-                  <span className="mx-1.5 text-[var(--text-4)]">·</span>
-                  <span className="tabular-nums">{v.phone}</span>
-                </div>
+        {vendors.map((v) => (
+          <div
+            key={v.id}
+            className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 transition ${
+              dispatched
+                ? "border-[rgba(255,138,77,0.3)] bg-[var(--dispatch-soft)]"
+                : "border-[var(--rule)] bg-[var(--card)]"
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-medium text-[var(--text)]">
+                {v.name}
               </div>
-              {isWinner ? (
-                <span className="shrink-0 rounded-[7px] border border-[rgba(255,138,77,0.3)] bg-[rgba(255,138,77,0.12)] px-2.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[var(--dispatch)]">
-                  ✓ Dispatched
-                </span>
-              ) : (
-                <button
-                  onClick={() => dispatch(v.id)}
-                  disabled={busy !== null || dispatched}
-                  className="shrink-0 rounded-[7px] bg-[var(--urgent)] px-3 py-1.5 text-[12px] font-medium text-white shadow-[0_4px_14px_-4px_var(--urgent-glow)] transition-all duration-150 hover:translate-y-[-1px] hover:shadow-[0_8px_20px_-4px_var(--urgent-glow)] active:translate-y-0 disabled:opacity-40 disabled:hover:translate-y-0"
-                >
-                  {busy === v.id ? "Dispatching…" : "Dispatch"}
-                </button>
-              )}
+              <div className="mt-0.5 font-mono text-[10.5px] tracking-[0.02em] text-[var(--text-3)]">
+                ★ {v.rating.toFixed(1)}
+                <span className="mx-1.5 text-[var(--text-4)]">·</span>
+                <span className="tabular-nums">{v.phone}</span>
+              </div>
             </div>
-          );
-        })}
+            {dispatched && (
+              <span className="shrink-0 rounded-[7px] border border-[rgba(255,138,77,0.3)] bg-[rgba(255,138,77,0.12)] px-2.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[var(--dispatch)]">
+                ✓ Angefragt
+              </span>
+            )}
+          </div>
+        ))}
       </div>
+      {!dispatched && (
+        <button
+          onClick={() => setReviewing(true)}
+          className="rounded-[8px] bg-[var(--urgent)] px-3 py-2.5 text-[13px] font-medium text-white shadow-[0_4px_14px_-4px_var(--urgent-glow)] transition-all duration-150 hover:translate-y-[-1px] hover:shadow-[0_8px_20px_-4px_var(--urgent-glow)] active:translate-y-0"
+        >
+          Review {vendors.length + 1}-email quote request →
+        </button>
+      )}
     </div>
   );
 }
