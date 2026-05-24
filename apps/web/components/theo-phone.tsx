@@ -22,8 +22,8 @@ const STATUS_LABEL: Record<CallStatus, string> = {
 };
 
 function modeCopy(mode: SpeakingMode): string {
-  if (mode === "speaking") return "Theo spricht";
-  if (mode === "listening") return "Theo hört zu";
+  if (mode === "speaking") return "spricht";
+  if (mode === "listening") return "hört zu";
   return "";
 }
 
@@ -42,7 +42,6 @@ export function TheoPhone({
   onStart,
   onEnd,
 }: Props) {
-  // Auto-scroll transcript on new turn
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -54,15 +53,27 @@ export function TheoPhone({
   const isLive = status === "connected" || status === "ending";
 
   return (
-    <aside className="z-10 flex h-full w-[340px] shrink-0 flex-col items-center justify-center px-4">
+    <aside className="flex h-full w-full items-center justify-center px-4 py-6">
       {/* The phone */}
-      <div className="relative h-[640px] w-[300px] rounded-[44px] bg-[#1a1a1f] p-[14px] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.04)]">
+      <div
+        className="relative h-[560px] w-[268px] rounded-[42px] p-[10px]"
+        style={{
+          background: "linear-gradient(180deg, #1a1a1f 0%, #0e0e12 100%)",
+          boxShadow:
+            "0 40px 80px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08)",
+        }}
+      >
         {/* Screen */}
-        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[32px] bg-gradient-to-b from-[#0f1219] via-[#0c0f17] to-[#0a0d14]">
+        <div
+          className="relative flex h-full w-full flex-col overflow-hidden rounded-[32px]"
+          style={{
+            background: "linear-gradient(180deg, #0c0e14 0%, #06070b 100%)",
+          }}
+        >
           {/* Status bar */}
-          <div className="relative flex items-center justify-between px-6 pt-3 text-[11px] font-medium text-zinc-300">
+          <div className="relative flex items-center justify-between px-5 pt-2.5 font-mono text-[11px] text-[var(--text-2)]">
             <span className="tabular-nums">{nowClock()}</span>
-            <span className="flex items-center gap-1.5 text-[9px] tracking-wider text-zinc-500">
+            <span className="flex items-center gap-1.5 text-[9px] tracking-wider text-[var(--text-3)]">
               <span>5G</span>
               <svg width="14" height="10" viewBox="0 0 14 10" fill="currentColor">
                 <rect x="0" y="6" width="2" height="4" rx="0.5" />
@@ -75,55 +86,73 @@ export function TheoPhone({
           </div>
 
           {/* Dynamic Island */}
-          <div className="pointer-events-none absolute left-1/2 top-2.5 z-10 h-[26px] w-[100px] -translate-x-1/2 rounded-[14px] bg-black" />
+          <div className="pointer-events-none absolute left-1/2 top-2 z-10 h-[22px] w-[88px] -translate-x-1/2 rounded-[12px] bg-black" />
 
           {/* Header */}
-          <div className="mt-3 flex flex-col items-center gap-0.5 px-6">
-            <div className="text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+          <div className="mt-5 flex flex-col items-center gap-0.5 px-5">
+            <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-[var(--text-3)]">
               hallo theo
             </div>
-            <div className="flex items-center gap-2 text-base font-medium text-zinc-100">
+            <div className="mt-1 flex items-center gap-2 text-base font-medium text-[var(--text)]">
               Theo
               <span
-                className={`size-1.5 rounded-full transition-colors duration-500 ${
-                  status === "connected"
-                    ? "bg-emerald-400"
-                    : status === "connecting" || status === "ending"
-                    ? "bg-amber-400"
-                    : status === "error"
-                    ? "bg-red-400"
-                    : "bg-zinc-600"
-                }`}
+                className="size-1.5 rounded-full transition-colors duration-500"
+                style={{
+                  background:
+                    status === "connected"
+                      ? "var(--accent)"
+                      : status === "connecting" || status === "ending"
+                      ? "var(--warning)"
+                      : status === "error"
+                      ? "var(--urgent)"
+                      : "var(--text-4)",
+                  boxShadow:
+                    status === "connected"
+                      ? "0 0 10px var(--accent-glow)"
+                      : "none",
+                }}
               />
             </div>
-            <div className="text-[10px] text-zinc-500">
+            <div className="text-[11px] text-[var(--text-3)]">
               {STATUS_LABEL[status]}
-              {isLive && mode ? ` · ${modeCopy(mode)}` : ""}
+              {isLive && mode ? (
+                <>
+                  {" "}
+                  <span className="text-[var(--text-4)]">·</span>{" "}
+                  <span className="text-[var(--accent)]">{modeCopy(mode)}</span>
+                </>
+              ) : (
+                ""
+              )}
             </div>
           </div>
 
-          {/* Body: switches on status */}
-          <div className="flex flex-1 flex-col overflow-hidden px-4">
-            {status === "idle" && <IdleBody onStart={onStart} />}
-            {status === "connecting" && <ConnectingBody onEnd={onEnd} />}
+          {/* Body */}
+          <div className="flex flex-1 flex-col overflow-hidden px-3.5">
+            {status === "idle" && <IdleBody />}
+            {status === "connecting" && <ConnectingBody />}
             {(status === "connected" || status === "ending") && (
               <LiveBody turns={turns} mode={mode} scrollRef={scrollRef} />
             )}
-            {status === "ended" && <EndedBody onStart={onStart} />}
+            {status === "ended" && <EndedBody />}
             {status === "error" && (
-              <ErrorBody message={error ?? "Unbekannter Fehler"} onStart={onStart} />
+              <ErrorBody message={error ?? "Unbekannter Fehler"} />
             )}
           </div>
 
-          {/* Bottom action bar — call / end-call */}
-          <div className="px-6 pb-7 pt-2">
+          {/* Bottom action */}
+          <div className="px-5 pb-6 pt-2">
             {(status === "connecting" ||
               status === "connected" ||
               status === "ending") && (
               <button
                 onClick={onEnd}
                 disabled={status === "ending"}
-                className="group relative mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-[0_8px_24px_-4px_rgba(239,68,68,0.6)] transition-transform duration-150 hover:scale-[1.04] active:scale-[0.96] disabled:opacity-60"
+                className="group relative mx-auto flex h-14 w-14 items-center justify-center rounded-full text-white transition-transform duration-150 hover:scale-[1.06] active:scale-[0.96] disabled:opacity-60"
+                style={{
+                  background: "var(--urgent)",
+                  boxShadow: "0 12px 32px -8px var(--urgent-glow)",
+                }}
                 aria-label="Anruf beenden"
               >
                 <EndCallIcon />
@@ -132,14 +161,27 @@ export function TheoPhone({
             {(status === "idle" || status === "ended" || status === "error") && (
               <button
                 onClick={onStart}
-                className="group relative mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_8px_24px_-4px_rgba(16,185,129,0.6)] transition-transform duration-150 hover:scale-[1.04] active:scale-[0.96]"
+                className="group relative mx-auto flex h-14 w-14 items-center justify-center rounded-full text-[#062818] transition-transform duration-150 hover:scale-[1.06] active:scale-[0.96]"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--accent) 0%, #00b873 100%)",
+                  boxShadow:
+                    "0 12px 32px -8px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.25)",
+                }}
                 aria-label="Theo anrufen"
               >
-                <span className="absolute inset-0 rounded-full bg-emerald-400/40 motion-safe:animate-[ping_2.4s_cubic-bezier(0,0,0.2,1)_infinite]" />
+                <span
+                  className="pointer-events-none absolute inset-0 rounded-full"
+                  style={{
+                    background: "var(--accent)",
+                    opacity: 0.4,
+                    animation: "ringPulse 2.4s cubic-bezier(0,0,0.2,1) infinite",
+                  }}
+                />
                 <PhoneIcon />
               </button>
             )}
-            <div className="mt-3 text-center text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+            <div className="mt-3 text-center font-mono text-[9.5px] uppercase tracking-[0.2em] text-[var(--text-3)]">
               {status === "idle" && "tap to call"}
               {status === "connecting" && "verbinde…"}
               {status === "connected" && "tap red to end"}
@@ -154,27 +196,52 @@ export function TheoPhone({
   );
 }
 
-function IdleBody({ onStart }: { onStart: () => void }) {
+function IdleBody() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-      <div className="size-16 rounded-full bg-gradient-to-br from-emerald-400/30 to-emerald-600/10 ring-1 ring-emerald-400/20" />
-      <div className="text-sm text-zinc-200">Ihr AI Hausmeister</div>
-      <div className="max-w-[200px] text-xs leading-relaxed text-zinc-500">
+      <div
+        className="size-16 rounded-full ring-1"
+        style={{
+          background:
+            "radial-gradient(circle at 30% 30%, rgba(0,229,143,0.35), rgba(0,229,143,0.05) 70%)",
+          boxShadow: "inset 0 0 24px rgba(0,229,143,0.15)",
+        }}
+      />
+      <div className="text-[13px] text-[var(--text)]">Ihr AI Hausmeister</div>
+      <div className="max-w-[200px] text-[11px] leading-relaxed text-[var(--text-3)]">
         Defekte, Notfälle, schnelle Fragen — Theo nimmt ab.
       </div>
     </div>
   );
 }
 
-function ConnectingBody({ onEnd: _onEnd }: { onEnd: () => void }) {
+function ConnectingBody() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4">
       <div className="relative size-20">
-        <span className="absolute inset-0 rounded-full border-2 border-amber-400/40 motion-safe:animate-[ping_1.4s_cubic-bezier(0,0,0.2,1)_infinite]" />
-        <span className="absolute inset-2 rounded-full border-2 border-amber-400/60 motion-safe:animate-[ping_1.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-safe:[animation-delay:200ms]" />
-        <span className="absolute inset-4 rounded-full bg-amber-400/80" />
+        <span
+          className="absolute inset-0 rounded-full border-2"
+          style={{
+            borderColor: "rgba(245,184,66,0.4)",
+            animation: "ringPulse 1.4s cubic-bezier(0,0,0.2,1) infinite",
+          }}
+        />
+        <span
+          className="absolute inset-2 rounded-full border-2"
+          style={{
+            borderColor: "rgba(245,184,66,0.6)",
+            animation: "ringPulse 1.4s cubic-bezier(0,0,0.2,1) infinite",
+            animationDelay: "200ms",
+          }}
+        />
+        <span
+          className="absolute inset-4 rounded-full"
+          style={{ background: "rgba(245,184,66,0.85)" }}
+        />
       </div>
-      <div className="text-xs text-zinc-400">verbinde mit Theo…</div>
+      <div className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-3)]">
+        verbinde mit Theo…
+      </div>
     </div>
   );
 }
@@ -189,13 +256,13 @@ function LiveBody({
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-2 overflow-hidden pt-2">
+    <div className="flex flex-1 flex-col gap-2 overflow-hidden pt-3">
       <div
         ref={scrollRef}
         className="flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-width:thin]"
       >
         {turns.length === 0 && (
-          <div className="pt-6 text-center text-[11px] text-zinc-500">
+          <div className="pt-6 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--text-3)]">
             Theo hört zu…
           </div>
         )}
@@ -203,10 +270,25 @@ function LiveBody({
           <Bubble key={t.id} turn={t} />
         ))}
         {mode === "listening" && turns.length > 0 && (
-          <div className="flex items-center gap-1.5 pl-3 pt-1">
-            <span className="size-1 animate-pulse rounded-full bg-zinc-500" />
-            <span className="size-1 animate-pulse rounded-full bg-zinc-500 [animation-delay:120ms]" />
-            <span className="size-1 animate-pulse rounded-full bg-zinc-500 [animation-delay:240ms]" />
+          <div className="flex items-center gap-1.5 pl-3 pt-1.5">
+            <span
+              className="size-[3px] rounded-full bg-[var(--accent)]"
+              style={{ animation: "urgentPulse 1.4s ease-in-out infinite" }}
+            />
+            <span
+              className="size-[3px] rounded-full bg-[var(--accent)]"
+              style={{
+                animation: "urgentPulse 1.4s ease-in-out infinite",
+                animationDelay: "150ms",
+              }}
+            />
+            <span
+              className="size-[3px] rounded-full bg-[var(--accent)]"
+              style={{
+                animation: "urgentPulse 1.4s ease-in-out infinite",
+                animationDelay: "300ms",
+              }}
+            />
           </div>
         )}
       </div>
@@ -220,15 +302,23 @@ function Bubble({ turn }: { turn: PhoneTurn }) {
     <div
       className={`flex ${fromTheo ? "" : "flex-row-reverse"}`}
       style={{
-        animation: "phoneBubbleIn 220ms cubic-bezier(0.23, 1, 0.32, 1) both",
+        animation: "phoneBubbleIn 240ms cubic-bezier(0.23, 1, 0.32, 1) both",
       }}
     >
       <div
         className={`max-w-[78%] rounded-2xl px-3 py-1.5 text-[12px] leading-snug ${
           fromTheo
-            ? "rounded-bl-md bg-zinc-800/80 text-zinc-100 ring-1 ring-white/5"
-            : "rounded-br-md bg-emerald-500/85 text-white shadow-sm"
+            ? "rounded-bl-[6px] border border-[var(--rule)] bg-white/[0.05] text-[var(--text)]"
+            : "rounded-br-[6px] font-medium text-[#062818]"
         }`}
+        style={
+          fromTheo
+            ? undefined
+            : {
+                background: "var(--accent)",
+                boxShadow: "0 4px 16px rgba(0,229,143,0.22)",
+              }
+        }
       >
         {turn.text}
       </div>
@@ -236,27 +326,43 @@ function Bubble({ turn }: { turn: PhoneTurn }) {
   );
 }
 
-function EndedBody({ onStart: _onStart }: { onStart: () => void }) {
+function EndedBody() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-      <div className="flex size-14 items-center justify-center rounded-full bg-emerald-500/20 ring-1 ring-emerald-400/30">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-300">
+      <div
+        className="flex size-14 items-center justify-center rounded-full ring-1"
+        style={{
+          background: "rgba(0,229,143,0.15)",
+          boxShadow: "inset 0 0 0 1px rgba(0,229,143,0.3)",
+        }}
+      >
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-[var(--accent)]"
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
-      <div className="text-sm text-zinc-100">Alles erledigt</div>
-      <div className="max-w-[200px] text-xs leading-relaxed text-zinc-500">
+      <div className="text-[13px] text-[var(--text)]">Alles erledigt</div>
+      <div className="max-w-[200px] text-[11px] leading-relaxed text-[var(--text-3)]">
         Theo kümmert sich. Sie bekommen eine E-Mail.
       </div>
     </div>
   );
 }
 
-function ErrorBody({ message, onStart: _onStart }: { message: string; onStart: () => void }) {
+function ErrorBody({ message }: { message: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
-      <div className="text-sm text-zinc-100">Anruf hat nicht geklappt</div>
-      <div className="max-w-[220px] text-xs leading-relaxed text-zinc-400">
+      <div className="text-[13px] text-[var(--text)]">Anruf hat nicht geklappt</div>
+      <div className="max-w-[220px] text-[11px] leading-relaxed text-[var(--text-3)]">
         {message}
       </div>
     </div>

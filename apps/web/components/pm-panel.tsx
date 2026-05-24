@@ -19,27 +19,27 @@ interface Props {
 
 const STATUS_LABEL: Record<CallStatus, string> = {
   in_progress: "Live",
-  video_pending: "Tutorial vorgeschlagen",
+  video_pending: "Tutorial",
   dispatch_pending: "Aktion nötig",
   video_sent: "Tutorial gesendet",
-  dispatched: "Handwerker dispatched",
+  dispatched: "Handwerker",
   ended: "Beendet",
 };
 
 const STATUS_TONE: Record<CallStatus, string> = {
-  in_progress: "ring-emerald-400/40 bg-emerald-400/10 text-emerald-200",
-  video_pending: "ring-yellow-400/40 bg-yellow-400/10 text-yellow-200",
-  dispatch_pending: "ring-red-400/50 bg-red-500/15 text-red-200",
-  video_sent: "ring-emerald-400/30 bg-emerald-400/5 text-emerald-300",
-  dispatched: "ring-orange-400/40 bg-orange-400/10 text-orange-200",
-  ended: "ring-white/15 bg-white/5 text-zinc-300",
+  in_progress: "text-[var(--accent)]",
+  video_pending: "text-[var(--warning)]",
+  dispatch_pending: "text-[var(--urgent)]",
+  video_sent: "text-[var(--accent)]",
+  dispatched: "text-[var(--dispatch)]",
+  ended: "text-[var(--text-3)]",
 };
 
 function timeAgo(iso: string): string {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return `${Math.floor(diff)}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 60) return `${Math.floor(diff)}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  return `${Math.floor(diff / 3600)}h`;
 }
 
 function fmtTime(iso: string): string {
@@ -64,7 +64,6 @@ export function PmPanel({
   onSelectUnit,
   pmActions,
 }: Props) {
-  // Auto-select the most urgent call (any awaiting-action) if nothing selected
   useEffect(() => {
     if (selectedCallId || selectedUnitId) return;
     const urgent = calls.find(
@@ -88,36 +87,30 @@ export function PmPanel({
   ).length;
 
   return (
-    <aside className="z-10 flex h-full w-[380px] shrink-0 flex-col gap-3 border-l border-white/10 bg-black/40 p-4 backdrop-blur">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-400">
-            Property manager
-          </div>
-          <div className="text-base font-semibold">Inbox</div>
-        </div>
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500">
-            Awaiting action
-          </div>
-          <div
-            className={`tabular-nums text-sm font-medium ${
-              awaiting > 0 ? "text-red-300" : "text-zinc-400"
-            }`}
-          >
-            {awaiting}
-          </div>
+    <aside className="relative z-10 flex h-full w-[400px] shrink-0 flex-col overflow-hidden border-l border-[var(--rule)] bg-black/30 backdrop-blur-xl">
+      {/* Inbox header */}
+      <div className="flex items-baseline justify-between border-b border-[var(--rule)] px-[22px] pb-3.5 pt-[18px]">
+        <h2 className="font-serif text-[22px] leading-none tracking-tight">
+          Inbox
+        </h2>
+        <div className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--text-3)]">
+          {calls.length.toString().padStart(2, "0")} calls
+          {awaiting > 0 && (
+            <>
+              {" · "}
+              <span className="font-medium text-[var(--urgent)]">
+                {awaiting.toString().padStart(2, "0")} urgent
+              </span>
+            </>
+          )}
         </div>
       </div>
 
       {/* Call list */}
-      <div
-        className="flex flex-col gap-1.5 overflow-y-auto pr-1"
-        style={{ maxHeight: "26vh" }}
-      >
+      <div className="max-h-[36%] shrink-0 overflow-y-auto border-b border-[var(--rule)]">
         {calls.length === 0 && (
-          <div className="rounded-md border border-dashed border-white/10 p-4 text-center text-xs text-zinc-500">
-            Inbox empty. Click a unit on the building for info.
+          <div className="px-[22px] py-6 text-center font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-3)]">
+            Inbox empty · click a unit on the building
           </div>
         )}
         {calls.map((c) => (
@@ -133,15 +126,19 @@ export function PmPanel({
         ))}
       </div>
 
-      {/* Selected detail — call OR unit-only */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto border-t border-white/10 pt-3">
+      {/* Detail */}
+      <div className="flex min-h-0 flex-1 flex-col gap-[22px] overflow-y-auto p-[22px]">
         {selectedCall ? (
           <CallDetail call={selectedCall} pmActions={pmActions} />
         ) : selectedUnit ? (
-          <UnitDetail unit={selectedUnit} calls={calls} onClose={() => onSelectUnit(null)} />
+          <UnitDetail
+            unit={selectedUnit}
+            calls={calls}
+            onClose={() => onSelectUnit(null)}
+          />
         ) : (
-          <div className="text-xs text-zinc-500">
-            Click a call above or a unit on the building.
+          <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-3)]">
+            Click a call above · or a unit on the building
           </div>
         )}
       </div>
@@ -159,63 +156,91 @@ function CallRow({
   onClick: () => void;
 }) {
   const isUrgent = call.status === "dispatch_pending";
+  const isLive = call.status === "in_progress";
+
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col gap-0.5 rounded-md border px-3 py-2 text-left text-xs transition ${
-        selected
-          ? "border-white/30 bg-white/10"
-          : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
-      } ${isUrgent ? "ring-1 ring-red-400/40" : ""}`}
+      className={`relative block w-full border-b border-[var(--rule)] px-[22px] py-3.5 text-left transition-colors duration-150 last:border-b-0 hover:bg-white/[0.025] ${
+        selected ? "bg-[rgba(0,229,143,0.03)]" : ""
+      }`}
+      style={{ animation: "rowArrive 1.6s ease-out" }}
     >
+      {/* Left accent rail */}
       {isUrgent && (
-        <span className="absolute left-0 top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 motion-safe:animate-pulse" />
-      )}
-      <div className="flex items-center justify-between">
-        <span className="font-medium text-zinc-100">{call.tenant_name}</span>
         <span
-          className={`rounded-full px-1.5 py-px text-[9px] ring-1 ${STATUS_TONE[call.status]}`}
+          className="absolute inset-y-0 left-0 w-0.5 bg-[var(--urgent)]"
+          style={{ boxShadow: "0 0 12px var(--urgent-glow)" }}
+        />
+      )}
+      {selected && !isUrgent && (
+        <span
+          className="absolute inset-y-0 left-0 w-0.5 bg-[var(--accent)]"
+          style={{ boxShadow: "0 0 12px var(--accent-glow)" }}
+        />
+      )}
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-[var(--text-3)]">
+          {fmtTime(call.started_at)} · {timeAgo(call.started_at)}
+        </span>
+        <span
+          className={`inline-flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.1em] ${STATUS_TONE[call.status]}`}
         >
+          <StatusDot pulsing={isUrgent || isLive} />
           {STATUS_LABEL[call.status]}
         </span>
       </div>
-      <div className="flex items-center justify-between text-[10px] text-zinc-400">
-        <span>
-          {call.unit_id.replace("u-", "Apt ").toUpperCase()} ·{" "}
-          {call.problem_name ?? "triaging…"}
+      <div className="mt-1.5 text-[14px] font-medium leading-tight tracking-tight text-[var(--text)]">
+        {call.tenant_name}
+      </div>
+      <div className="mt-1 flex items-center gap-2 text-[12px] text-[var(--text-2)]">
+        <span className="rounded border border-[var(--rule)] px-1.5 py-px font-mono text-[10.5px] text-[var(--text-3)]">
+          {call.unit_id.replace("u-", "APT ").toUpperCase()}
         </span>
-        <span className="shrink-0">{timeAgo(call.started_at)}</span>
+        <span className="truncate">{call.problem_name ?? "triaging…"}</span>
       </div>
     </button>
+  );
+}
+
+function StatusDot({ pulsing = false }: { pulsing?: boolean }) {
+  return (
+    <span
+      className="size-[5px] rounded-full bg-current"
+      style={{
+        boxShadow: "0 0 8px currentColor",
+        animation: pulsing ? "urgentPulse 2s ease-in-out infinite" : undefined,
+      }}
+    />
   );
 }
 
 function CallDetail({ call, pmActions }: { call: Call; pmActions: PmActions }) {
   return (
     <>
-      <div>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-zinc-400">
-              {call.unit_id.replace("u-", "Apt ").toUpperCase()} ·{" "}
-              {fmtTime(call.started_at)}
-            </div>
-            <div className="mt-0.5 text-sm font-medium text-zinc-100">
-              {call.tenant_name}
-            </div>
-          </div>
+      <header className="flex flex-col gap-1">
+        <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-3)]">
+          {call.unit_id.replace("u-", "APT ").toUpperCase()} ·{" "}
+          {fmtTime(call.started_at)} · {call.tenant_name.toUpperCase()}
+        </div>
+        <h3 className="font-serif text-[22px] leading-tight tracking-tight">
+          {call.problem_name ?? "Triaging…"}
+        </h3>
+        <div className="mt-0.5 flex items-center gap-2">
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${STATUS_TONE[call.status]}`}
+            className={`inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] ${STATUS_TONE[call.status]}`}
           >
+            <StatusDot
+              pulsing={
+                call.status === "in_progress" ||
+                call.status === "dispatch_pending"
+              }
+            />
             {STATUS_LABEL[call.status]}
           </span>
         </div>
-        {call.problem_name && (
-          <div className="mt-2 text-xs text-zinc-300">
-            Problem: <span className="font-medium">{call.problem_name}</span>
-          </div>
-        )}
-      </div>
+      </header>
 
       <TranscriptBox turns={call.transcript} />
 
@@ -242,56 +267,92 @@ function UnitDetail({
 
   return (
     <>
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-zinc-400">
-            {unit.label} · Etage {unit.floor}
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-3)]">
+            {unit.label} · ETAGE {unit.floor}
           </div>
-          <div className="mt-0.5 text-sm font-medium text-zinc-100">
+          <h3 className="font-serif text-[22px] leading-tight tracking-tight">
             {unit.tenant_name ?? "—"}
-          </div>
+          </h3>
         </div>
         <button
           onClick={onClose}
-          className="rounded-md p-1 text-zinc-400 hover:bg-white/10 hover:text-white"
+          className="grid size-7 place-items-center rounded-[7px] border border-[var(--rule)] text-[var(--text-3)] transition hover:border-[var(--rule-strong)] hover:text-[var(--text)]"
           aria-label="Close"
         >
-          ✕
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
         </button>
-      </div>
-      <div className="rounded-md border border-white/10 bg-white/5 p-3 text-xs text-zinc-300">
-        <div className="flex items-center justify-between">
-          <span className="text-zinc-500">Status</span>
-          <span className="capitalize">{unit.status}</span>
-        </div>
-        {unit.badge && (
-          <div className="mt-1 text-[11px] text-zinc-400">{unit.badge}</div>
-        )}
-      </div>
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-zinc-500">
-          Recent calls
-        </div>
-        <div className="mt-1.5 space-y-1">
-          {unitCalls.length === 0 && (
-            <div className="rounded-md border border-dashed border-white/10 p-3 text-center text-[11px] text-zinc-500">
-              No calls yet for this apartment.
-            </div>
+      </header>
+
+      <div className="flex flex-col gap-2">
+        <SectionLabel label="Status" />
+        <div className="flex items-center justify-between rounded-[10px] border border-[var(--rule)] bg-[var(--card)] px-3.5 py-2.5">
+          <span className="text-[13px] capitalize">{unit.status}</span>
+          {unit.badge && (
+            <span className="font-mono text-[10.5px] text-[var(--text-3)]">
+              {unit.badge}
+            </span>
           )}
-          {unitCalls.slice(0, 5).map((c) => (
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <SectionLabel
+          label="Recent calls"
+          right={`${unitCalls.length.toString().padStart(2, "0")} total`}
+        />
+        {unitCalls.length === 0 && (
+          <div className="rounded-[10px] border border-dashed border-[var(--rule)] px-3.5 py-3 text-center font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-3)]">
+            No calls yet for this apartment
+          </div>
+        )}
+        <div className="flex flex-col">
+          {unitCalls.slice(0, 5).map((c, i) => (
             <div
               key={c.id}
-              className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[11px]"
+              className={`flex items-center justify-between gap-2 py-2.5 ${
+                i < unitCalls.slice(0, 5).length - 1
+                  ? "border-b border-[var(--rule)]"
+                  : ""
+              }`}
             >
-              <span className="text-zinc-200">
+              <span className="text-[12.5px] text-[var(--text)]">
                 {c.problem_name ?? "triaging…"}
               </span>
-              <span className="text-zinc-500">{timeAgo(c.started_at)}</span>
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--text-3)]">
+                {timeAgo(c.started_at)} ago
+              </span>
             </div>
           ))}
         </div>
       </div>
     </>
+  );
+}
+
+function SectionLabel({ label, right }: { label: string; right?: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--text-3)]">
+        {label}
+      </span>
+      {right && (
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-3)]">
+          {right}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -306,37 +367,35 @@ function TranscriptBox({ turns }: { turns: TranscriptTurn[] }) {
 
   if (turns.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-white/10 p-3 text-center text-[11px] text-zinc-500">
-        No transcript yet.
+      <div className="rounded-[10px] border border-dashed border-[var(--rule)] px-3.5 py-3 text-center font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-3)]">
+        No transcript yet
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-zinc-500">
-        Transcript
-      </div>
+    <div className="flex flex-col gap-2">
+      <SectionLabel label="Transcript" right={`${turns.length} turns`} />
       <div
         ref={ref}
-        className="max-h-40 overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2 text-xs"
+        className="max-h-44 overflow-y-auto rounded-[10px] border border-[var(--rule)] bg-black/30 p-3"
       >
         {turns.map((t, i) => (
           <div
             key={i}
-            className={`mb-1.5 flex gap-2 last:mb-0 ${
+            className={`mb-2 flex last:mb-0 ${
               t.speaker === "theo" ? "" : "flex-row-reverse"
             }`}
           >
             <div
-              className={`max-w-[78%] rounded-lg px-2 py-1 leading-snug ${
+              className={`max-w-[82%] rounded-[12px] px-2.5 py-1.5 text-[12px] leading-snug ${
                 t.speaker === "theo"
-                  ? "bg-indigo-500/20 text-indigo-50 ring-1 ring-indigo-400/20"
-                  : "bg-zinc-700/40 text-zinc-100 ring-1 ring-white/10"
+                  ? "rounded-bl-[5px] border border-[var(--rule)] bg-white/[0.04] text-[var(--text)]"
+                  : "rounded-br-[5px] bg-[var(--accent)] font-medium text-[#062818] shadow-[0_4px_16px_rgba(0,229,143,0.2)]"
               }`}
             >
-              <div className="text-[9px] uppercase tracking-wider opacity-60">
-                {t.speaker === "theo" ? "Theo" : "Tenant"}
+              <div className="mb-0.5 font-mono text-[8.5px] uppercase tracking-[0.1em] opacity-60">
+                {t.speaker === "theo" ? "Theo" : "Mieter"}
               </div>
               <div>{t.text}</div>
             </div>
@@ -360,8 +419,9 @@ function DecisionPane({
     return <DispatchPane call={call} pmActions={pmActions} />;
   if (call.status === "in_progress")
     return (
-      <div className="rounded-md border border-emerald-400/20 bg-emerald-400/5 p-3 text-xs text-emerald-200">
-        Theo is on the call. Decision options appear after triage.
+      <div className="flex items-center gap-2 rounded-[10px] border border-[rgba(0,229,143,0.2)] bg-[var(--accent-soft)] px-3.5 py-3 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--accent)]">
+        <StatusDot pulsing />
+        Theo is on the call · decision options appear after triage
       </div>
     );
   return null;
@@ -370,7 +430,7 @@ function DecisionPane({
 function VideoCard({ video }: { video: Video }) {
   const thumb = youtubeThumb(video.youtube_url);
   return (
-    <div className="overflow-hidden rounded-md border border-white/10 bg-white/[0.03]">
+    <div className="overflow-hidden rounded-[10px] border border-[var(--rule)] bg-[var(--card)]">
       {thumb && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -379,13 +439,15 @@ function VideoCard({ video }: { video: Video }) {
           className="aspect-video w-full object-cover opacity-90"
         />
       )}
-      <div className="p-2.5">
-        <div className="text-xs font-medium text-zinc-100">{video.title}</div>
+      <div className="p-3">
+        <div className="text-[13px] font-medium leading-tight text-[var(--text)]">
+          {video.title}
+        </div>
         <a
           href={video.youtube_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-1 inline-block break-all text-[10px] text-zinc-400 underline hover:text-zinc-200"
+          className="mt-1.5 inline-block break-all font-mono text-[10px] text-[var(--text-3)] underline-offset-2 hover:text-[var(--text-2)] hover:underline"
         >
           {video.youtube_url}
         </a>
@@ -394,13 +456,7 @@ function VideoCard({ video }: { video: Video }) {
   );
 }
 
-function VideoPane({
-  call,
-  pmActions,
-}: {
-  call: Call;
-  pmActions: PmActions;
-}) {
+function VideoPane({ call, pmActions }: { call: Call; pmActions: PmActions }) {
   const [busy, setBusy] = useState(false);
   const problem = PROBLEMS.find((p) => p.id === call.problem_id);
   const video = problem?.video_id
@@ -420,27 +476,26 @@ function VideoPane({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-wider text-zinc-500">
-          {sent ? "Tutorial gesendet" : "Suggested tutorial"}
-        </div>
-        {sent && call.video_sent_at && (
-          <div className="text-[10px] text-emerald-300/70">
-            sent {timeAgo(call.video_sent_at)}
-          </div>
-        )}
-      </div>
+    <div className="flex flex-col gap-2.5">
+      <SectionLabel
+        label={sent ? "Tutorial gesendet" : "Suggested tutorial"}
+        right={
+          sent && call.video_sent_at ? `sent ${timeAgo(call.video_sent_at)}` : undefined
+        }
+      />
       <VideoCard video={video} />
       {sent ? (
-        <div className="rounded-md border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-[11px] text-emerald-200">
-          ✓ Sent to tenant. Unit back to green.
+        <div className="flex items-center gap-2 rounded-[10px] border border-[rgba(0,229,143,0.2)] bg-[var(--accent-soft)] px-3.5 py-2.5 text-[11.5px] text-[var(--accent)]">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Sent to tenant · unit back to green
         </div>
       ) : (
         <button
           onClick={send}
           disabled={busy}
-          className="mt-1 rounded-md bg-yellow-400 px-3 py-2 text-sm font-medium text-zinc-900 transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
+          className="rounded-[8px] bg-[var(--warning)] px-3 py-2.5 text-[13px] font-medium text-[#3a2a05] transition-all duration-150 hover:translate-y-[-1px] hover:shadow-[0_8px_20px_-4px_rgba(245,184,66,0.45)] active:translate-y-0 disabled:opacity-60"
         >
           {busy ? "Sending…" : "Send to tenant"}
         </button>
@@ -474,48 +529,44 @@ function DispatchPane({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-wider text-zinc-500">
-          {dispatched ? "Handwerker dispatched" : "Suggested Handwerker"}
-        </div>
-        <div className="text-[10px] text-zinc-500">
-          {dispatched ? `${vendors.length} options` : `${vendors.length} options`}
-        </div>
-      </div>
-      <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2.5">
+      <SectionLabel
+        label={dispatched ? "Handwerker dispatched" : "Suggested Handwerker"}
+        right={`${vendors.length.toString().padStart(2, "0")} options`}
+      />
+      <div className="flex flex-col gap-2">
         {vendors.map((v) => {
           const isWinner = dispatchedVendorId === v.id;
           return (
             <div
               key={v.id}
-              className={`flex items-center justify-between gap-2 rounded-md border p-2 transition-opacity ${
+              className={`flex items-center justify-between gap-3 rounded-[10px] border px-3.5 py-3 transition ${
                 isWinner
-                  ? "border-orange-400/30 bg-orange-400/5"
+                  ? "border-[rgba(255,138,77,0.3)] bg-[var(--dispatch-soft)]"
                   : dispatched
-                  ? "border-white/5 bg-white/[0.02] opacity-40"
-                  : "border-white/10 bg-white/[0.04]"
+                  ? "border-[var(--rule)] bg-[var(--card)] opacity-40"
+                  : "border-[var(--rule)] bg-[var(--card)] hover:border-[var(--rule-strong)] hover:bg-[var(--card-hover)]"
               }`}
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-medium text-zinc-100">
+                <div className="truncate text-[13px] font-medium text-[var(--text)]">
                   {v.name}
                 </div>
-                <div className="flex items-center gap-2 text-[10px] text-zinc-400">
-                  <span>★ {v.rating.toFixed(1)}</span>
-                  <span className="text-zinc-600">·</span>
+                <div className="mt-0.5 font-mono text-[10.5px] tracking-[0.02em] text-[var(--text-3)]">
+                  ★ {v.rating.toFixed(1)}
+                  <span className="mx-1.5 text-[var(--text-4)]">·</span>
                   <span className="tabular-nums">{v.phone}</span>
                 </div>
               </div>
               {isWinner ? (
-                <span className="shrink-0 rounded-md bg-orange-400/15 px-2.5 py-1.5 text-[11px] font-medium text-orange-200 ring-1 ring-orange-400/30">
+                <span className="shrink-0 rounded-[7px] border border-[rgba(255,138,77,0.3)] bg-[rgba(255,138,77,0.12)] px-2.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[var(--dispatch)]">
                   ✓ Dispatched
                 </span>
               ) : (
                 <button
                   onClick={() => dispatch(v.id)}
                   disabled={busy !== null || dispatched}
-                  className="shrink-0 rounded-md bg-red-500 px-2.5 py-1.5 text-[11px] font-medium text-white transition-transform duration-150 hover:scale-[1.04] active:scale-[0.96] disabled:opacity-40"
+                  className="shrink-0 rounded-[7px] bg-[var(--urgent)] px-3 py-1.5 text-[12px] font-medium text-white shadow-[0_4px_14px_-4px_var(--urgent-glow)] transition-all duration-150 hover:translate-y-[-1px] hover:shadow-[0_8px_20px_-4px_var(--urgent-glow)] active:translate-y-0 disabled:opacity-40 disabled:hover:translate-y-0"
                 >
                   {busy === v.id ? "Dispatching…" : "Dispatch"}
                 </button>
