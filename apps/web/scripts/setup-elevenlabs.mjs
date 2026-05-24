@@ -20,7 +20,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const API_KEY = process.env.ELEVENLABS_API_KEY;
 const WEBHOOK_BASE = process.env.THEO_WEBHOOK_BASE_URL;
-const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "pNInz6obpgDQGcFmaJgB";
+// Default DE voice: Markus (native German, conversational). Overridable.
+const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "LUzaUbqkQoIF8hikIilf";
+// English voice: keep Adam — known good English Conversational AI voice.
+const EN_VOICE_ID = process.env.ELEVENLABS_EN_VOICE_ID || "pNInz6obpgDQGcFmaJgB";
 const EXISTING_ID = process.env.THEO_AGENT_ID;
 
 if (!API_KEY) { console.error("Missing ELEVENLABS_API_KEY"); process.exit(1); }
@@ -234,13 +237,18 @@ const agentBody = {
       first_message: "Hier ist Theo. Welche Wohnung? Stock und Buchstabe.",
       language: "de",
     },
-    // Allow English as a presetted secondary language so the agent can
-    // switch to it without losing voice/quality settings.
+    // Override the TTS voice per detected language so the German turns sound
+    // native German (Markus) and English turns stay in the English voice.
+    // Without this the same English-trained voice carries an English accent
+    // when speaking German after a mid-call language switch.
     language_presets: {
       en: {
         overrides: {
           agent: {
             first_message: "Theo here. Which apartment? Floor and letter.",
+          },
+          tts: {
+            voice_id: EN_VOICE_ID,
           },
         },
       },
@@ -248,8 +256,8 @@ const agentBody = {
     tts: {
       voice_id: VOICE_ID,
       model_id: "eleven_flash_v2_5",
-      stability: 0.45,
-      similarity_boost: 0.7,
+      stability: 0.5,
+      similarity_boost: 0.75,
     },
     asr: {
       quality: "high",

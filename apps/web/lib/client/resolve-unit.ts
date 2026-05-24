@@ -2,21 +2,25 @@ import { UNITS } from "@/lib/unit-config";
 import type { Unit } from "@/lib/unit-types";
 
 /**
- * Resolve a unit from a `floor` + `apartment` pair. Falls back to a random
- * unit so the demo never deadlocks. Mirror of lib/server/find-unit.ts but
- * runs entirely in the browser.
+ * Strict apartment resolver. Returns the matching Unit or `null` when no
+ * such apartment exists in the building. Callers decide how to handle the
+ * miss (Theo re-asks the tenant; the demo scenarios pick a random unit).
  */
 export function resolveUnit(input: {
   floor?: number;
   apartment?: string;
-}): Unit {
-  if (input.floor !== undefined && input.apartment) {
-    const f = Number(input.floor);
-    const a = input.apartment.toUpperCase().trim();
-    const hit = UNITS.find(
-      (u) => u.floor === f && u.label.toUpperCase().endsWith(a),
-    );
-    if (hit) return hit;
-  }
+}): Unit | null {
+  if (input.floor === undefined || !input.apartment) return null;
+  const f = Number(input.floor);
+  const a = input.apartment.toUpperCase().trim();
+  if (!Number.isFinite(f)) return null;
+  return (
+    UNITS.find((u) => u.floor === f && u.label.toUpperCase().endsWith(a)) ??
+    null
+  );
+}
+
+/** Random unit fallback for demo scenarios that don't care about identity. */
+export function randomUnit(): Unit {
   return UNITS[Math.floor(Math.random() * UNITS.length)];
 }

@@ -13,10 +13,20 @@ export default function Home() {
   const { units, calls, stats, handlers, pmActions, reset } = useTheoStore();
   const call = useTheoCall({ handlers });
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
 
   function handleUnitClick(u: Unit) {
+    setSelectedUnitId(u.id);
     const callForUnit = calls.find((c) => c.unit_id === u.id);
-    if (callForUnit) setSelectedCallId(callForUnit.id);
+    setSelectedCallId(callForUnit?.id ?? null);
+  }
+
+  function handleSelectCall(id: string | null) {
+    setSelectedCallId(id);
+    if (id) {
+      const c = calls.find((c) => c.id === id);
+      setSelectedUnitId(c?.unit_id ?? null);
+    }
   }
 
   return (
@@ -63,20 +73,27 @@ export default function Home() {
         onEnd={call.end}
       />
 
-      {/* Center: 3D scene */}
-      <div className="flex-1">
+      {/* Center: 3D scene with scenarios anchored at its bottom-center */}
+      <div className="relative flex-1">
         <BuildingScene units={units} onUnitClick={handleUnitClick} />
+        <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
+          <ScenarioControls handlers={handlers} reset={reset} />
+        </div>
       </div>
 
       {/* Right: PM panel */}
       <PmPanel
         calls={calls}
+        units={units}
         selectedCallId={selectedCallId}
-        onSelect={setSelectedCallId}
+        selectedUnitId={selectedUnitId}
+        onSelectCall={handleSelectCall}
+        onSelectUnit={(id) => {
+          setSelectedUnitId(id);
+          setSelectedCallId(null);
+        }}
         pmActions={pmActions}
       />
-
-      <ScenarioControls handlers={handlers} reset={reset} />
     </div>
   );
 }

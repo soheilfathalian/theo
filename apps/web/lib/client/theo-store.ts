@@ -6,7 +6,7 @@ import type { Unit, UnitStatus } from "@/lib/unit-types";
 import { PROBLEMS } from "@/lib/data/problems";
 import { VIDEOS } from "@/lib/data/videos";
 import { SERVICE_PROVIDERS } from "@/lib/data/service-providers";
-import { resolveUnit } from "./resolve-unit";
+import { resolveUnit, randomUnit } from "./resolve-unit";
 
 export type CallStatus =
   /** Theo is on the call */
@@ -131,6 +131,14 @@ export function useTheoStore() {
     () => ({
       async start_call({ floor, apartment, tenant_name, initial_turn }) {
         const unit = resolveUnit({ floor, apartment });
+        if (!unit) {
+          // Apartment doesn't exist. Theo must ask again.
+          return JSON.stringify({
+            ok: false,
+            error: "apartment_not_found",
+            hint: "Building has floors 0–4 and apartments A–E. Ask the tenant to repeat their floor and apartment letter.",
+          });
+        }
         const callId = newCallId();
         const call: Call = {
           id: callId,
@@ -183,6 +191,13 @@ export function useTheoStore() {
           });
         }
         const unit = resolveUnit({ floor, apartment });
+        if (!unit) {
+          return JSON.stringify({
+            ok: false,
+            error: "apartment_not_found",
+            hint: "Building has floors 0–4 and apartments A–E.",
+          });
+        }
 
         // Surface Theo's one-liner if it provided one, so the PM panel has
         // a clean summary even when the turn-by-turn transcript is sparse.
