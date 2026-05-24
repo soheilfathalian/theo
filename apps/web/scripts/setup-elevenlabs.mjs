@@ -212,10 +212,38 @@ const agentBody = {
         prompt,
         llm: "claude-sonnet-4-5",
         tool_ids: toolIds,
+        // Surface the language-detection built-in so Theo can switch DE↔EN
+        // mid-conversation when the tenant changes language.
+        built_in_tools: {
+          language_detection: {
+            type: "system",
+            name: "language_detection",
+            description:
+              "Detect the user's spoken language and respond in that language for the rest of the call.",
+            params: { system_tool_type: "language_detection" },
+          },
+          end_call: {
+            type: "system",
+            name: "end_call",
+            description:
+              "End the call ONLY after the tenant has confirmed they have nothing else to ask.",
+            params: { system_tool_type: "end_call" },
+          },
+        },
       },
-      first_message:
-        "Hier ist Theo. Welche Wohnung? Stock und Buchstabe.",
+      first_message: "Hier ist Theo. Welche Wohnung? Stock und Buchstabe.",
       language: "de",
+    },
+    // Allow English as a presetted secondary language so the agent can
+    // switch to it without losing voice/quality settings.
+    language_presets: {
+      en: {
+        overrides: {
+          agent: {
+            first_message: "Theo here. Which apartment? Floor and letter.",
+          },
+        },
+      },
     },
     tts: {
       voice_id: VOICE_ID,

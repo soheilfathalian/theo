@@ -4,12 +4,14 @@ import { useState } from "react";
 import { BuildingScene } from "@/components/building-scene";
 import { ScenarioControls } from "@/components/scenario-controls";
 import { PmPanel } from "@/components/pm-panel";
-import { TheoWidget } from "@/components/theo-widget";
+import { TheoPhone } from "@/components/theo-phone";
 import { useTheoStore } from "@/lib/client/theo-store";
+import { useTheoCall } from "@/lib/client/use-theo-call";
 import type { Unit } from "@/lib/unit-types";
 
 export default function Home() {
   const { units, calls, stats, handlers, reset } = useTheoStore();
+  const call = useTheoCall({ handlers });
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
 
   function handleUnitClick(u: Unit) {
@@ -20,7 +22,7 @@ export default function Home() {
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-[#0a0b14] text-white">
       {/* Top bar */}
-      <div className="pointer-events-none absolute top-0 left-0 right-[396px] z-10 flex items-start justify-between p-6">
+      <div className="pointer-events-none absolute left-[340px] right-[396px] top-0 z-10 flex items-start justify-between p-6">
         <div>
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-zinc-400">
             <span>hallo theo</span>
@@ -47,12 +49,22 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 3D scene */}
+      {/* Left: Theo phone */}
+      <TheoPhone
+        status={call.status}
+        mode={call.mode}
+        turns={call.turns}
+        error={call.error}
+        onStart={call.start}
+        onEnd={call.end}
+      />
+
+      {/* Center: 3D scene */}
       <div className="flex-1">
         <BuildingScene units={units} onUnitClick={handleUnitClick} />
       </div>
 
-      {/* PM panel */}
+      {/* Right: PM panel */}
       <PmPanel
         calls={calls}
         selectedCallId={selectedCallId}
@@ -60,7 +72,6 @@ export default function Home() {
       />
 
       <ScenarioControls handlers={handlers} reset={reset} />
-      <TheoWidget handlers={handlers} />
     </div>
   );
 }
