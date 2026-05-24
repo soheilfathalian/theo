@@ -10,7 +10,7 @@ import { useTheoCall } from "@/lib/client/use-theo-call";
 import type { Unit } from "@/lib/unit-types";
 
 export default function Home() {
-  const { units, calls, stats, handlers, reset } = useTheoStore();
+  const { units, calls, stats, handlers, pmActions, reset } = useTheoStore();
   const call = useTheoCall({ handlers });
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
 
@@ -37,14 +37,18 @@ export default function Home() {
             Today
           </div>
           <div className="mt-0.5 text-sm">
-            <span className="font-mono text-green-400">{stats.deflected}</span>{" "}
-            deflected ·{" "}
-            <span className="font-mono text-orange-400">{stats.dispatched}</span>{" "}
-            dispatched ·{" "}
-            <span className="font-mono text-emerald-300">
-              €{stats.savedEuros.toLocaleString("de-DE")}
+            <span className="font-mono text-zinc-200">{stats.total}</span>{" "}
+            calls ·{" "}
+            <span
+              className={`font-mono ${
+                stats.awaiting_action > 0 ? "text-red-400" : "text-zinc-400"
+              }`}
+            >
+              {stats.awaiting_action}
             </span>{" "}
-            saved
+            awaiting action ·{" "}
+            <span className="font-mono text-emerald-300">{stats.resolved}</span>{" "}
+            resolved
           </div>
         </div>
       </div>
@@ -69,6 +73,7 @@ export default function Home() {
         calls={calls}
         selectedCallId={selectedCallId}
         onSelect={setSelectedCallId}
+        pmActions={pmActions}
       />
 
       <ScenarioControls handlers={handlers} reset={reset} />

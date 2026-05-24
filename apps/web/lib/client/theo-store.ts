@@ -1,18 +1,25 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { UNITS as SEED_UNITS } from "@/lib/unit-config";
 import type { Unit, UnitStatus } from "@/lib/unit-types";
 import { PROBLEMS } from "@/lib/data/problems";
 import { VIDEOS } from "@/lib/data/videos";
-import { pickBestVendor } from "@/lib/data/service-providers";
+import { SERVICE_PROVIDERS } from "@/lib/data/service-providers";
 import { resolveUnit } from "./resolve-unit";
 
 export type CallStatus =
+  /** Theo is on the call */
   | "in_progress"
-  | "deflected"
-  | "escalated"
+  /** Triaged → video resolution. Yellow on the building, waiting for PM to send. */
+  | "video_pending"
+  /** Triaged → dispatch resolution. Red on the building, waiting for PM to pick a vendor. */
+  | "dispatch_pending"
+  /** PM clicked "Send video" — tenant got the tutorial, unit back to green. */
+  | "video_sent"
+  /** PM picked a vendor — unit orange, vendor notified. */
   | "dispatched"
+  /** Call ended without a triage decision (rare). */
   | "ended";
 
 export type TranscriptTurn = {
@@ -29,19 +36,21 @@ export interface Call {
   ended_at?: string;
   status: CallStatus;
   transcript: TranscriptTurn[];
+  /** Theo's triage decision */
   problem_id?: string;
   problem_name?: string;
   resolution?: "video" | "dispatch";
-  video_url?: string;
-  vendor_name?: string;
-  vendor_slot?: string;
-  amount_cents?: number;
+  /** PM action: video path */
+  video_sent_at?: string;
+  /** PM action: dispatch path */
+  dispatched_vendor_id?: string;
+  dispatched_at?: string;
 }
 
 export interface Stats {
-  deflected: number;
-  dispatched: number;
-  savedEuros: number;
+  total: number;
+  awaiting_action: number;
+  resolved: number;
 }
 
 export interface TheoHandlers {
@@ -66,6 +75,13 @@ export interface TheoHandlers {
   }) => Promise<string>;
 }
 
+export interface PmActions {
+  /** PM sends the curated tutorial video to the tenant. Yellow → green. */
+  sendVideo: (callId: string) => Promise<void>;
+  /** PM dispatches one of the suggested vendors. Red → orange. */
+  dispatch: (callId: string, vendorId: string) => Promise<void>;
+}
+
 function newCallId(): string {
   return `c-${(globalThis.crypto?.randomUUID?.() ?? Math.random().toString(16)).slice(0, 10)}`;
 }
@@ -74,38 +90,26 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function computeStats(calls: Call[]): Stats {
+  let awaiting = 0;
+  let resolved = 0;
+  for (const c of calls) {
+    if (c.status === "video_pending" || c.status === "dispatch_pending") awaiting++;
+    else if (c.status === "video_sent" || c.status === "dispatched") resolved++;
+  }
+  return { total: calls.length, awaiting_action: awaiting, resolved };
+}
+
 /**
- * Pure client-side Theo state. The ElevenLabs widget dispatches tool calls
- * into the handlers here; React state mutates immediately and the UI
- * (3D building + PM panel) updates without any server round-trip.
+ * Theo only triages — the property manager makes every action decision.
  *
- * Side effects (Stripe transfer, Resend email) are fired from inside the
- * handlers via stateless /api/* endpoints, which is the only place we still
- * touch the server.
+ * report_triage stops at red (dispatch_pending) or yellow (video_pending).
+ * sendVideo() and dispatch() are explicit PM actions that fire side effects
+ * (email, Stripe transfer) and move the unit forward.
  */
 export function useTheoStore() {
   const [units, setUnits] = useState<Unit[]>(SEED_UNITS);
   const [calls, setCalls] = useState<Call[]>([]);
-  const [stats, setStats] = useState<Stats>({
-    deflected: 0,
-    dispatched: 0,
-    savedEuros: 0,
-  });
-
-  // Track active timers so we can clear when resetting
-  const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
-  function scheduleTimeout(fn: () => void, ms: number) {
-    const t = setTimeout(() => {
-      timersRef.current.delete(t);
-      fn();
-    }, ms);
-    timersRef.current.add(t);
-    return t;
-  }
-  function clearAllTimers() {
-    for (const t of timersRef.current) clearTimeout(t);
-    timersRef.current.clear();
-  }
 
   function setUnitStatus(
     unitId: string,
@@ -178,23 +182,11 @@ export function useTheoStore() {
             error: `unknown problem_id: ${problem_id}`,
           });
         }
-
         const unit = resolveUnit({ floor, apartment });
-        const video = problem.video_id
-          ? VIDEOS.find((v) => v.id === problem.video_id)
-          : undefined;
 
-        patchCall(call_id, {
-          problem_id: problem.id,
-          problem_name: problem.name,
-          resolution: problem.resolution,
-          unit_id: unit.id,
-        });
-
+        // Surface Theo's one-liner if it provided one, so the PM panel has
+        // a clean summary even when the turn-by-turn transcript is sparse.
         if (transcript_summary) {
-          // Surface Theo's internal one-liner as a system-style turn so the
-          // PM panel reflects what Theo concluded even if append_turn was
-          // skipped.
           setCalls((curr) =>
             curr.map((c) =>
               c.id === call_id
@@ -202,7 +194,11 @@ export function useTheoStore() {
                     ...c,
                     transcript: [
                       ...c.transcript,
-                      { speaker: "theo", text: transcript_summary, at: nowIso() },
+                      {
+                        speaker: "theo",
+                        text: transcript_summary,
+                        at: nowIso(),
+                      },
                     ],
                   }
                 : c,
@@ -211,110 +207,113 @@ export function useTheoStore() {
         }
 
         if (problem.resolution === "video") {
-          setUnitStatus(unit.id, "yellow", `Video gesendet · ${problem.name}`);
           patchCall(call_id, {
-            status: "deflected",
-            video_url: video?.youtube_url,
-          });
-          setStats((s) => ({
-            deflected: s.deflected + 1,
-            dispatched: s.dispatched,
-            savedEuros: (s.deflected + 1) * 200,
-          }));
-
-          // Side effect: fire-and-forget email (the /api/email route will
-          // either send a real Resend email when configured, or no-op in dev)
-          if (video) {
-            void fetch("/api/email/tutorial", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                tenant_name: unit.tenant_name,
-                problem_name: problem.name,
-                video_url: video.youtube_url,
-                video_title: video.title,
-              }),
-            }).catch(() => {});
-          }
-
-          // Reset unit to green after a moment so the building doesn't stay yellow
-          scheduleTimeout(() => {
-            setUnitStatus(unit.id, "green", undefined);
-            patchCall(call_id, { status: "ended", ended_at: nowIso() });
-          }, 6000);
-
-          return JSON.stringify({
-            ok: true,
+            problem_id: problem.id,
+            problem_name: problem.name,
             resolution: "video",
-            video_url: video?.youtube_url,
+            unit_id: unit.id,
+            status: "video_pending",
           });
-        }
-
-        // dispatch path
-        const vendor = pickBestVendor(problem.category);
-        setUnitStatus(unit.id, "red", `Notfall · ${problem.name}`);
-        patchCall(call_id, { status: "escalated" });
-
-        scheduleTimeout(() => {
           setUnitStatus(
             unit.id,
-            "orange",
-            `${vendor.name} · morgen 9:00 · €340 hinterlegt`,
+            "yellow",
+            `Tutorial vorgeschlagen · ${problem.name}`,
           );
+        } else {
           patchCall(call_id, {
-            status: "dispatched",
-            vendor_name: vendor.name,
-            vendor_slot: "morgen 9:00",
-            amount_cents: 34000,
-            ended_at: nowIso(),
+            problem_id: problem.id,
+            problem_name: problem.name,
+            resolution: "dispatch",
+            unit_id: unit.id,
+            status: "dispatch_pending",
           });
-          setStats((s) => ({
-            deflected: s.deflected,
-            dispatched: s.dispatched + 1,
-            savedEuros: s.savedEuros,
-          }));
-
-          // Side effects: real Stripe transfer + tenant confirmation email
-          void fetch("/api/stripe/transfer", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              vendor_id: vendor.id,
-              amount_cents: 34000,
-            }),
-          }).catch(() => {});
-          void fetch("/api/email/dispatch", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tenant_name: unit.tenant_name,
-              vendor_name: vendor.name,
-              vendor_slot: "morgen 9:00",
-              amount_cents: 34000,
-            }),
-          }).catch(() => {});
-        }, 1500);
+          setUnitStatus(unit.id, "red", `Aktion nötig · ${problem.name}`);
+        }
 
         return JSON.stringify({
           ok: true,
-          resolution: "dispatch",
-          vendor_name: vendor.name,
-          slot: "morgen 9:00",
-          amount_cents: 34000,
+          resolution: problem.resolution,
+          note: "noted for property manager review",
         });
       },
     }),
-    // Stable identity — all setters are functional updates that don't capture state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
+  const pmActions: PmActions = useMemo(
+    () => ({
+      async sendVideo(callId) {
+        const call = calls.find((c) => c.id === callId);
+        if (!call || !call.problem_id) return;
+        const problem = PROBLEMS.find((p) => p.id === call.problem_id);
+        const video = problem?.video_id
+          ? VIDEOS.find((v) => v.id === problem.video_id)
+          : undefined;
+        if (!video) return;
+
+        patchCall(callId, { status: "video_sent", video_sent_at: nowIso() });
+        setUnitStatus(call.unit_id, "green", undefined);
+
+        // Fire-and-forget email (dry-run if Resend not configured)
+        void fetch("/api/email/tutorial", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenant_name: call.tenant_name,
+            problem_name: problem?.name,
+            video_url: video.youtube_url,
+            video_title: video.title,
+          }),
+        }).catch(() => {});
+      },
+
+      async dispatch(callId, vendorId) {
+        const call = calls.find((c) => c.id === callId);
+        if (!call) return;
+        const vendor = SERVICE_PROVIDERS.find((v) => v.id === vendorId);
+        if (!vendor) return;
+
+        patchCall(callId, {
+          status: "dispatched",
+          dispatched_vendor_id: vendorId,
+          dispatched_at: nowIso(),
+        });
+        setUnitStatus(
+          call.unit_id,
+          "orange",
+          `${vendor.name} dispatched`,
+        );
+
+        // Fire-and-forget: Stripe deposit + tenant confirmation email
+        void fetch("/api/stripe/transfer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vendor_id: vendor.id,
+            amount_cents: 34000,
+          }),
+        }).catch(() => {});
+        void fetch("/api/email/dispatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenant_name: call.tenant_name,
+            vendor_name: vendor.name,
+            vendor_slot: "morgen 9:00",
+            amount_cents: 34000,
+          }),
+        }).catch(() => {});
+      },
+    }),
+    [calls],
+  );
+
   const reset = useCallback(() => {
-    clearAllTimers();
     setUnits(SEED_UNITS);
     setCalls([]);
-    setStats({ deflected: 0, dispatched: 0, savedEuros: 0 });
   }, []);
 
-  return { units, calls, stats, handlers, reset };
+  const stats = computeStats(calls);
+
+  return { units, calls, stats, handlers, pmActions, reset };
 }

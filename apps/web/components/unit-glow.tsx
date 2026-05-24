@@ -40,7 +40,8 @@ export function UnitGlow({ unit, onClick }: Props) {
       const pulse = unit.status === "yellow"
         ? 0.6 + Math.sin(t * 6) * 0.3
         : unit.status === "red"
-        ? 0.5 + Math.sin(t * 4) * 0.25
+        // Stronger pulse: higher base + wider amplitude + faster than yellow
+        ? 0.8 + Math.sin(t * 5) * 0.55
         : 0.65;
       matRef.current.emissiveIntensity = hovered ? pulse + 0.4 : pulse;
     }
