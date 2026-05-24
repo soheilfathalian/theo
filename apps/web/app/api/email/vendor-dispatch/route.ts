@@ -1,18 +1,23 @@
 /**
- * Send the tenant a confirmation email when Theo dispatches a Handwerker.
+ * Vendor-facing job brief email. Sent when the PM dispatches a Handwerker.
  *
- * Stateless: called from the browser. No-ops if RESEND_API_KEY / DEMO_INBOX_EMAIL
- * aren't set.
+ * For the demo, the recipient is the shared DEMO_INBOX_EMAIL so the audience
+ * sees both the [TO-VENDOR] and [TO-TENANT] emails arrive on the same phone.
  */
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
 interface Body {
-  tenant_name?: string;
   vendor_name: string;
+  vendor_email: string;
+  problem_name: string;
+  unit_label: string;
+  tenant_name?: string;
+  tenant_phone?: string;
   vendor_slot: string;
   amount_cents: number;
+  stripe_transfer_id?: string;
 }
 
 export async function POST(req: Request) {
@@ -31,24 +36,28 @@ export async function POST(req: Request) {
       mode: "dry-run",
       preview: {
         to,
-        subject: `[TO-TENANT] Theo: Handwerker organisiert`,
+        subject: `[TO-VENDOR] Auftrag: ${body.problem_name} – ${body.unit_label}`,
       },
     });
   }
 
   const tenant = body.tenant_name ?? "Mieter";
   const amount = (body.amount_cents / 100).toFixed(0);
+  const transferRef = body.stripe_transfer_id ?? "tr_demo_pending";
+
   const html = `
     <div style="font-family: -apple-system, system-ui, sans-serif; color: #18181b; max-width: 560px;">
-      <h2 style="color: #f97316;">Theo · hallo theo</h2>
-      <p>Hallo ${tenant},</p>
-      <p>Ich habe einen Handwerker für Sie organisiert:</p>
-      <ul>
-        <li><strong>Firma:</strong> ${body.vendor_name}</li>
-        <li><strong>Termin:</strong> ${body.vendor_slot}</li>
-        <li><strong>Anzahlung:</strong> €${amount} (via Stripe hinterlegt)</li>
-      </ul>
-      <p>Eine Bestätigung des Handwerkers folgt separat.</p>
+      <h2 style="color: #ef4444;">Auftrag von Theo · hallo theo</h2>
+      <p>Sehr geehrte Damen und Herren,</p>
+      <p>wir haben einen Auftrag für Sie:</p>
+      <table style="border-collapse: collapse; margin: 12px 0;">
+        <tr><td style="padding: 4px 12px 4px 0; color: #71717a;">Adresse</td><td>Beispielstraße 12, ${body.unit_label}</td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #71717a;">Problem</td><td><strong>${body.problem_name}</strong></td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #71717a;">Mieter</td><td>${tenant}${body.tenant_phone ? ` · ${body.tenant_phone}` : ""}</td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #71717a;">Termin</td><td>${body.vendor_slot}</td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #71717a;">Anzahlung</td><td>€${amount} via Stripe (Ref: <code>${transferRef}</code>)</td></tr>
+      </table>
+      <p>Bitte bestätigen Sie kurz per Antwortmail.</p>
       <p style="color: #71717a; font-size: 13px;">— Theo (AI Hausmeister) · hallo theo</p>
     </div>
   `;
@@ -63,7 +72,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         from: "Theo <onboarding@resend.dev>",
         to: [to],
-        subject: `[TO-TENANT] Theo: Handwerker organisiert · ${body.vendor_name}`,
+        subject: `[TO-VENDOR] Auftrag: ${body.problem_name} – ${body.unit_label} · ${body.vendor_name}`,
         html,
       }),
     });

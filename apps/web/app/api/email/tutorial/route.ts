@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Theo <theo@resend.dev>",
+        from: "Theo <onboarding@resend.dev>",
         to: [to],
         subject: `[TO-TENANT] Theo: Anleitung für ${body.problem_name}`,
         html,

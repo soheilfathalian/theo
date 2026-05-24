@@ -287,6 +287,10 @@ export function useTheoStore() {
         if (!call) return;
         const vendor = SERVICE_PROVIDERS.find((v) => v.id === vendorId);
         if (!vendor) return;
+        const unit = units.find((u) => u.id === call.unit_id);
+        const problem = call.problem_id
+          ? PROBLEMS.find((p) => p.id === call.problem_id)
+          : undefined;
 
         patchCall(callId, {
           status: "dispatched",
@@ -299,7 +303,7 @@ export function useTheoStore() {
           `${vendor.name} dispatched`,
         );
 
-        // Fire-and-forget: Stripe deposit + tenant confirmation email
+        // Fire-and-forget: Stripe deposit + tenant confirmation + vendor brief
         void fetch("/api/stripe/transfer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -318,9 +322,22 @@ export function useTheoStore() {
             amount_cents: 34000,
           }),
         }).catch(() => {});
+        void fetch("/api/email/vendor-dispatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vendor_name: vendor.name,
+            vendor_email: vendor.email,
+            problem_name: problem?.name ?? "Reparatur",
+            unit_label: unit?.label ?? call.unit_id,
+            tenant_name: call.tenant_name,
+            vendor_slot: "morgen 9:00",
+            amount_cents: 34000,
+          }),
+        }).catch(() => {});
       },
     }),
-    [calls],
+    [calls, units],
   );
 
   const reset = useCallback(() => {
